@@ -1,0 +1,3 @@
+# Preserve the original bytes of the supplied data and task documents.
+/data/raw/*.csv -text
+/docs/task/*.pdf -text
