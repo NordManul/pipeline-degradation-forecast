@@ -1,0 +1,14 @@
+{
+  "late": {
+    "model": "gam",
+    "coverage_80": 0.7358490566037735,
+    "mean_width_mm": 1.0886105493592138,
+    "n": 53
+  },
+  "cold_test": {
+    "model": "huber",
+    "coverage_80": 0.23404255319148937,
+    "mean_width_mm": 0.6697872958708456,
+    "n": 94
+  }
+}

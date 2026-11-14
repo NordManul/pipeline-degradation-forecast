@@ -1,0 +1,170 @@
+{
+  "created_utc": "2026-11-14T02:27:36.507674+00:00",
+  "git_commit": "ec859c9025eab1ed20c8979bef9431f4e77d65d1",
+  "git_dirty": false,
+  "python": "3.12.14",
+  "versions": {
+    "numpy": "2.2.6",
+    "pandas": "2.2.3",
+    "scipy": "1.15.3",
+    "scikit-learn": "1.6.1",
+    "catboost": "1.2.8",
+    "matplotlib": "3.10.3",
+    "joblib": "1.6.0"
+  },
+  "source_sha256": {
+    "__init__.py": "b0b64a503097c989b7df71a645be71eb9fda4b56e650b0bbe50e3a3886469931",
+    "diagnostics.py": "2b76495a6959864612b54d6efb8969a78e858ce2ecf0e489255cd52f0ae58a4c",
+    "experiments.py": "bfa2d3e05b5f7d7a359324cf16f04bb31b6363f29478cb5d6fc2454fcdb695f2",
+    "features.py": "9e39377a47499381c03df8310cf35773997f8614ea56a0c2fa046504677d03a1",
+    "geometry.py": "8d4219c2928c324940a50567786f7f0856adaf224a7aa314b36a11e5b61b015b",
+    "matching.py": "d95eb40a419f44eeea192a8e23d841a1776668fd506836d503c6e57ca9fd9dd3",
+    "models\\__init__.py": "4cfd09b0ab4db4090c0b99436377317fe6904cd0dfae9f6081e7729e1b718bb4",
+    "models\\baselines.py": "6a3aaba5bf7744503159259ccc30f6eb099817eae63c19a58364318403717505",
+    "models\\ensemble.py": "b5e1f3fb570008d30254d0440542f8db35b937d4b2209c4facce8f3eddb91b61",
+    "models\\physics.py": "cb9e7f64bf6a70cc956cb65c1882325ca84cd4f3d700877fafc71d3f58bffa97",
+    "models\\tabular.py": "94497ac525fd7f5424bdc8701ad6fb70f58b837611996fa94f366cab283bb484",
+    "physical_features.py": "57c713316ff5a6c178b2a3f53f3f9b1dfa0e47a1e44952edbdc6d18d95592490",
+    "pipeline.py": "1c9b17cc275f4d3a8d92b13250d544ea39bf7ba57276915b78111931cd22d227",
+    "reporting.py": "748bb7f2de2f673beb57fd47e1e47ebce8762099dc3541f3714f3f8a19c15a34",
+    "sources.py": "f480db78c756cd2f34638c28cfcaab83bb0d8dd10ca3e471f4cfd8e177015df9",
+    "submission.py": "1e12fff1df829d65c0c816c9641af05a92e49872d34f7a910cec470d00c3147f",
+    "targets.py": "ee090d1f077a0116dd666ff838984eef30ab2a33fa84d6ca3db14eb2da8da6da",
+    "uncertainty.py": "15bdfd4ae382262c8ec6ff7a157ef6de9add3573d9bc6e915ac1db7996531797",
+    "validation.py": "7ed3f942b7aeea29f372635d7dfc54c90130bd69c84f600b7c5fee895189630e"
+  },
+  "input_manifest": {
+    "pot_south.csv": {
+      "sha256": "c613a97a4e3d8b33e3ef2357caa98dd5fd6dbedefc8f52c8fa28a80ea29bf9e8",
+      "rows": 16,
+      "columns": 286
+    },
+    "altitudes_south.csv": {
+      "sha256": "2b3f5d05d34fff4ff066e9c3da9d47ad5bed0323de08be94b4ab4c06f967947c",
+      "rows": 20218,
+      "columns": 5
+    },
+    "tech_mode_for_embedings_with_length_with_temperatures_ids16.csv": {
+      "sha256": "560ba4c56429ae07969385a161e9d1b9665399af728e6d29f66d6e26cb227134",
+      "rows": 39052,
+      "columns": 24
+    },
+    "vtd_south_train.csv": {
+      "sha256": "e4cae76524ea06e44bf5e315f99786f655cebc5fe8206871da4fb70ef8f687b2",
+      "rows": 48291,
+      "columns": 42
+    },
+    "uzt_south.csv": {
+      "sha256": "25187e44c134a2bbf157471e03f0c8d37178796d062af4e613dd6a0f4e9a42b9",
+      "rows": 67,
+      "columns": 10
+    },
+    "repcorr_south.csv": {
+      "sha256": "1c17535b437b0ea036330db1996d04f7e0a4792b555b249b02d57f4e593f2dbf",
+      "rows": 495,
+      "columns": 59
+    }
+  },
+  "config": {
+    "seed": 42,
+    "data_dir": "data/raw",
+    "contract": "configs/data_contract.yaml",
+    "output_dir": "artifacts",
+    "development": {
+      "ids": [
+        "1250009490",
+        "1250022871",
+        "1250011604"
+      ],
+      "anchor_date": "2018-09-23",
+      "target_date": "2022-07-06"
+    },
+    "late": {
+      "ids": [
+        "1250009490",
+        "1250011604"
+      ],
+      "anchor_date": "2022-07-06",
+      "target_date": "2023-12-01"
+    },
+    "cold_train": {
+      "ids": [
+        "1250009490",
+        "1250022871",
+        "1250011604"
+      ],
+      "target_date": "2018-09-23"
+    },
+    "cold_test": {
+      "ids": [
+        "1250009584",
+        "1250009587",
+        "1250028931",
+        "1250028932",
+        "1250028933",
+        "1250028934",
+        "1250028935"
+      ],
+      "target_date": "2023-08-12"
+    },
+    "section_offsets_m": {
+      "1250009490": 0.0,
+      "1250022871": 44.7,
+      "1250011604": 5293.1
+    },
+    "folds": 4,
+    "spatial_buffer_m": 100.0,
+    "history_radius_m": 50.0,
+    "models": [
+      "persistence",
+      "smooth_persistence",
+      "global_rate",
+      "local_rate",
+      "ridge",
+      "ridge_direct",
+      "huber",
+      "gam",
+      "random_forest",
+      "catboost",
+      "physics",
+      "physics_residual",
+      "e02_mode",
+      "e02_water",
+      "e02_thermal",
+      "e02_terrain"
+    ],
+    "ensemble_candidates": [
+      "persistence",
+      "ridge",
+      "catboost",
+      "physics"
+    ]
+  },
+  "contract": {
+    "segment_length_m": 10.0,
+    "grid_scope": "simple_section",
+    "target_policy": "reported_residual",
+    "depth_fraction_dates": [
+      "2018-09-23"
+    ],
+    "depth_percent_dates": [
+      "2014-12-28",
+      "2022-07-06",
+      "2023-08-12",
+      "2023-12-01"
+    ],
+    "thickness_tolerance_mm": 0.05,
+    "endpoint_policy": "exclude"
+  },
+  "evaluation": "historical_reconstruction_on_reported_labels",
+  "prediction_bounds": "0 <= prediction_mm <= audited passport nominal_mm",
+  "selection": "positive Pearson r, maximum squared Pearson r, then minimum MAE; development OOF only",
+  "limitations": [
+    "Scoring IDs, dates, official grid and label policy are unconfirmed.",
+    "Development is spatial transfer within one transition, not a chronological backtest.",
+    "Late and cold targets were audited before implementation; they are not pristine blind tests.",
+    "All regime rows must precede T; actual future regime scenarios are not inferred.",
+    "Unreported target thickness remains unknown and is excluded from every model's score.",
+    "Cold transfer has one training main and one test main; intervals have no coverage guarantee."
+  ]
+}

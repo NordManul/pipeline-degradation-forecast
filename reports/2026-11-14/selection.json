@@ -1,0 +1,51 @@
+{
+  "between": {
+    "champion": "gam",
+    "weights": {
+      "persistence": 2.625802136488331e-19,
+      "ridge": 5.414389101518401e-19,
+      "catboost": 0.9828338486826034,
+      "physics": 0.0171661513173967
+    },
+    "calibration_residual_q10_q90_mm": [
+      -0.6112422024352542,
+      0.47736834692395913
+    ],
+    "development_score": {
+      "split": "development",
+      "model": "gam",
+      "n": 561,
+      "pearson_r": 0.5323682336544326,
+      "pearson_squared": 0.2834159362043406,
+      "mae_mm": 0.34748584393316406,
+      "rmse_mm": 0.46405841530531483,
+      "bias_mm": 0.023919604726858393,
+      "recall_thin_10pct": 0.33508771929824566
+    }
+  },
+  "cold": {
+    "champion": "huber",
+    "weights": {
+      "persistence": 0.0029753663262943766,
+      "ridge": 0.23935765021063013,
+      "catboost": 0.17481811078413625,
+      "physics": 0.5828488726789393
+    },
+    "calibration_residual_q10_q90_mm": [
+      -0.669787295870846,
+      0.7725086568635446
+    ],
+    "development_score": {
+      "split": "development",
+      "model": "huber",
+      "n": 372,
+      "pearson_r": 0.04208946096255213,
+      "pearson_squared": 0.0017715227241181996,
+      "mae_mm": 0.4482270621008313,
+      "rmse_mm": 0.5619508421831005,
+      "bias_mm": -0.005195432405776913,
+      "recall_thin_10pct": 0.10526315789473684
+    }
+  },
+  "frozen_before_test_scoring_utc": "2026-11-14T02:27:57.752322+00:00"
+}

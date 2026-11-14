@@ -2,6 +2,7 @@
 
 import base64
 from html import escape
+import json
 from pathlib import Path
 
 import matplotlib
@@ -12,10 +13,10 @@ import pandas as pd
 
 
 SPLIT_TITLES = {
-    "development": "2018 → 2022: spatial development OOF",
-    "cold_development": "Cold start: spatial OOF on MAIN-2 (2018)",
-    "late": "2022 → 2023: later-campaign transfer",
-    "cold_test": "Cold start: unseen MAIN-3 (2023)",
+    "development": "Между ВТД: пространственная проверка OOF",
+    "cold_development": "Без прошлого ВТД: пространственная проверка",
+    "late": "Между ВТД: перенос на позднее обследование",
+    "cold_test": "Без прошлого ВТД: новая труба",
 }
 
 
@@ -24,7 +25,7 @@ def _save(fig, path):
     plt.close(fig)
 
 
-def _leaderboard(metrics, split, champion, path):
+def _leaderboard(metrics, split, champion, path, date_label=""):
     table = metrics.loc[metrics.split.eq(split)].copy()
     # Negative-r candidates are visibly marked, never promoted by squaring their sign away.
     table["positive_r"] = table.pearson_r.gt(0)
@@ -32,12 +33,12 @@ def _leaderboard(metrics, split, champion, path):
     labels = [name + ("  *" if name == champion else "") for name in table.model]
     y = np.arange(len(table))
     fig, axes = plt.subplots(1, 2, figsize=(13, 9), sharey=True)
-    colors = ["#159570" if name == champion else ("#426cba" if r >= 0 else "#d88030") for name, r in zip(table.model, table.pearson_r)]
+    colors = ["#159570" if name == champion else ("#9ca5b4" if not np.isfinite(r) else ("#426cba" if r >= 0 else "#d88030")) for name, r in zip(table.model, table.pearson_r)]
     axes[0].barh(y, table.pearson_squared.fillna(0), color=colors)
     finite_scores = table.pearson_squared.dropna()
     axes[0].set_xlim(0, max(0.15, float(finite_scores.max()) * 1.55 if len(finite_scores) else 0.15))
     for index, row in enumerate(table.itertuples()):
-        label = f"{row.pearson_squared:.3f}  (r={row.pearson_r:+.3f})" if np.isfinite(row.pearson_r) else "undefined: constant"
+        label = f"{row.pearson_squared:.3f}  (r={row.pearson_r:+.3f})" if np.isfinite(row.pearson_r) else "не определён: константа"
         axes[0].text((row.pearson_squared if np.isfinite(row.pearson_squared) else 0) + axes[0].get_xlim()[1] * 0.015, index, label, va="center", fontsize=8)
     axes[1].barh(y, table.mae_mm, color=colors)
     axes[1].set_xlim(0, max(0.1, float(table.mae_mm.max()) * 1.23))
@@ -45,13 +46,13 @@ def _leaderboard(metrics, split, champion, path):
         axes[1].text(value + axes[1].get_xlim()[1] * 0.015, index, f"{value:.3f}", va="center", fontsize=9)
     axes[0].set_yticks(y, labels)
     axes[0].invert_yaxis()
-    axes[0].set_xlabel("Squared Pearson correlation — higher, with positive r")
-    axes[1].set_xlabel("MAE, mm — lower")
+    axes[0].set_xlabel("Pearson² — больше при положительном r")
+    axes[1].set_xlabel("MAE, мм — меньше")
     for axis in axes:
         axis.grid(axis="x", alpha=0.2)
         axis.set_axisbelow(True)
-    fig.suptitle(f"{SPLIT_TITLES[split]}\nSame {int(table.n.iloc[0])} reported target cells for every model", fontsize=14)
-    fig.text(0.5, 0.012, "* Frozen choice from development only. Orange = negative signed correlation. Unknown target cells are unscored.", ha="center", fontsize=9)
+    fig.suptitle(f"{SPLIT_TITLES[split]}: {date_label}\nОдинаковые {int(table.n.iloc[0])} наблюдаемых целей для всех моделей", fontsize=14)
+    fig.text(0.5, 0.012, "* Выбор только по development. Оранжевый: r < 0; серый: корреляция не определена. Неизвестные цели не оцениваются.", ha="center", fontsize=9)
     fig.tight_layout(rect=(0, 0.035, 1, 0.94))
     _save(fig, path)
 
@@ -66,10 +67,10 @@ def _scatter(tables, selection, path):
         low, high = min(table.y_mm.min(), table[name].min()), max(table.y_mm.max(), table[name].max())
         axis.plot([low, high], [low, high], linestyle="--", color="#666666", linewidth=1)
         axis.set_title(f"{split} | {name}\nn={len(table)}", fontsize=11)
-        axis.set_xlabel("Observed thickness, mm")
-        axis.set_ylabel("Predicted thickness, mm")
+        axis.set_xlabel("Измеренная толщина, мм")
+        axis.set_ylabel("Прогноз толщины, мм")
         axis.grid(alpha=0.2)
-    fig.suptitle("Frozen model: predicted vs observed thickness", fontsize=14)
+    fig.suptitle("Модель, выбранная до теста: прогноз и измерение", fontsize=14)
     fig.tight_layout()
     _save(fig, path)
 
@@ -83,7 +84,7 @@ def _profile(table, champion, path):
             axis.plot(group.chain_position_m / 1000, group.persistence, color="#8a91a0", linewidth=0.8, alpha=0.7, label="persistence" if number == 0 else None)
         observed = group.loc[group.observed]
         axis.scatter(observed.chain_position_m / 1000, observed.y_mm, color="#283a60", s=12, alpha=0.65, label="observed target" if number == 0 else None)
-    axis.set(title="MAIN-2 development: buffered out-of-fold predictions along the pipe", xlabel="Main-chain distance, km", ylabel="Thickness, mm")
+    axis.set(title="OOF-прогнозы вдоль трубы с пространственным буфером", xlabel="Координата вдоль MAIN, км", ylabel="Толщина, мм")
     axis.legend(loc="lower left", ncols=3)
     axis.grid(alpha=0.2)
     fig.tight_layout()
@@ -93,15 +94,15 @@ def _profile(table, champion, path):
 def _coverage(coverage, path):
     fig, axis = plt.subplots(figsize=(11, 4.8))
     y = np.arange(len(coverage))
-    axis.barh(y, coverage.observed, color="#426cba", label="Reported thickness")
-    axis.barh(y, coverage.cells - coverage.observed, left=coverage.observed, color="#dce3ed", label="Unknown thickness")
+    axis.barh(y, coverage.observed, color="#426cba", label="Наблюдаемая толщина")
+    axis.barh(y, coverage.cells - coverage.observed, left=coverage.observed, color="#dce3ed", label="Неизвестная толщина")
     labels = coverage.main_id + " | " + pd.to_datetime(coverage.date).dt.strftime("%Y-%m-%d")
     axis.set_yticks(y, labels)
     axis.invert_yaxis()
     for i, row in enumerate(coverage.itertuples()):
         axis.text(row.cells + 15, i, f"{row.observed}/{row.cells}", va="center", fontsize=10)
     axis.set_xlim(0, coverage.cells.max() * 1.15)
-    axis.set(title="Target coverage: absence of a reported defect is not a healthy-wall label", xlabel="Local 10-metre cells")
+    axis.set(title="Покрытие целей: отсутствие записи оставляет толщину неизвестной", xlabel="Локальные ячейки по 10 м")
     axis.legend(loc="lower right")
     fig.tight_layout()
     _save(fig, path)
@@ -109,12 +110,20 @@ def _coverage(coverage, path):
 
 def create_report(output, metrics, tables, selection, coverage, intervals):
     output = Path(output)
+    provenance = json.loads((output / "provenance.json").read_text(encoding="utf-8"))
+    config = provenance["config"]
+    policy = provenance["contract"]["target_policy"]
+    cold_n, cold_total = int(tables["cold_test"].observed.sum()), len(tables["cold_test"])
+    base_count = metrics.loc[metrics.split.eq("development"), "model"].nunique() - 2
     plt.rcParams.update({"font.family": "DejaVu Sans", "axes.spines.top": False, "axes.spines.right": False})
     plots = []
     for split in SPLIT_TITLES:
         champion = selection["cold" if split.startswith("cold") else "between"]["champion"]
         filename = f"leaderboard_{split}.png"
-        _leaderboard(metrics, split, champion, output / "plots" / filename)
+        key = "cold_train" if split == "cold_development" else split
+        spec = config[key]
+        dates = (spec["anchor_date"] + " → " if "anchor_date" in spec else "T = ") + spec["target_date"]
+        _leaderboard(metrics, split, champion, output / "plots" / filename, dates)
         plots.append(filename)
     _scatter(tables, selection, output / "plots/scatter.png")
     _profile(tables["development"], selection["between"]["champion"], output / "plots/profile.png")
@@ -125,7 +134,7 @@ def create_report(output, metrics, tables, selection, coverage, intervals):
     im = axis.imshow(correlation.to_numpy(), cmap="coolwarm", vmin=-1, vmax=1)
     axis.set_xticks(range(len(correlation)), correlation.columns, rotation=60, ha="right", fontsize=8)
     axis.set_yticks(range(len(correlation)), correlation.index, fontsize=8)
-    axis.set_title("Development OOF residual correlation — ensemble diversity")
+    axis.set_title("Корреляция ошибок OOF: разнообразие моделей для ансамбля")
     fig.colorbar(im, ax=axis, shrink=0.75)
     fig.tight_layout()
     _save(fig, output / "plots/residual_correlation.png")
@@ -143,14 +152,14 @@ def create_report(output, metrics, tables, selection, coverage, intervals):
         correlation_text = f"{row.pearson_r:.4f}" if np.isfinite(row.pearson_r) else "не определён"
         squared = f"{row.pearson_squared:.4f}" if np.isfinite(row.pearson_squared) else "не определён"
         lines.append(f"| {row.split} | {row.model} | {row.n} | {correlation_text} | {squared} | {row.mae_mm:.4f} |")
-    lines += ["", "Сравниваются 16 отдельных кандидатов и два ансамбля. Рейтинг всех моделей находится в `metrics.csv`.",
+    lines += ["", f"Сравниваются {base_count} отдельных кандидатов и два ансамбля. Рейтинг всех моделей находится в `metrics.csv`.",
               "Каждый кандидат оценён на одной и той же маске наблюдаемых целей; пропуски не заполнены номиналом.",
               "Предсказания ограничены диапазоном от 0 до проверенного паспортного номинала.", "",
-              "Development — пространственная проверка одного перехода 2018→2022 с буфером 100 м.",
-              "Это не обучение до 2022 года с полностью неизвестным обследованием 2022 года.",
-              "Late — перенос на два коротких участка 2022→2023. Cold test — перенос с MAIN-2 на MAIN-3 без прошлого ВТД.",
-              "Размечено 94 из 2185 ячеек cold test; большинство записей этой кампании относится к производственным дефектам.",
-              "Показатели этой выборки нельзя считать доказательством прогноза будущей внутренней коррозии.", "",
+              f"Development — пространственная проверка перехода {config['development']['anchor_date']} → {config['development']['target_date']} с буфером {config['spatial_buffer_m']} м.",
+              "Это оценка пространственного переноса внутри известного перехода, а не полностью временной backtest.",
+              "Late — перенос на следующую доступную кампанию после фиксации модели. Cold test — другая труба без прошлого ВТД.",
+              f"Размечено {cold_n} из {cold_total} ячеек cold test. Политика цели: `{policy}`.",
+              "Состав типов дефектов и маска целей требуют подтверждения; рейтинг не доказывает прогноз будущей внутренней коррозии.", "",
               "Режимы используются строго до даты T; для будущего T потребуется сценарий будущего режима.",
               "Поздние данные ранее проходили аудит. После просмотра этих результатов повторный подбор будет исследовательским.",
               "ID, даты, сетка и состав официальной конкурсной цели пока не подтверждены; `selected_predictions.csv` — исторический результат.", "",
@@ -163,7 +172,7 @@ def create_report(output, metrics, tables, selection, coverage, intervals):
     images = "\n".join(f'<figure><img alt="{escape(name)}" src="data:image/png;base64,{base64.b64encode((output / "plots" / name).read_bytes()).decode()}"></figure>' for name in plots)
     notes = (
         "Результаты относятся к исторической реконструкции и наблюдаемым целям. "
-        "Cold test содержит 94 размеченные ячейки из 2185; большинство записей — производственные дефекты. "
+        f"Cold test содержит {cold_n} размеченных ячеек из {cold_total}; политика цели: {policy}. "
         "Официальные ID, даты, сетка и политика целей пока не подтверждены. "
         "Поздние кампании уже проходили аудит и исследовательскую оценку; это не новый слепой тест. "
         "Интервалы по OOF-остаткам не гарантируют 80% покрытия при переносе. "

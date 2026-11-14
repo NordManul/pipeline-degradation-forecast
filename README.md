@@ -4,6 +4,11 @@
 16 отдельных моделей, блендинг и вложенный стекинг, проверка переноса на позднее ВТД
 и другую трубу, графики, сохранение моделей и экспорт по ключам шаблона.
 
+[Результаты первого цикла и ограничения](reports/2026-11-14/README.md) ·
+[Отчёт с графиками](reports/2026-11-14/report.html) ·
+[Таблица всех моделей](reports/2026-11-14/metrics.csv).
+На development лидирует GAM (Pearson² 0.2834), но устойчивый перенос на новую трубу пока не подтверждён.
+
 ## Запуск
 
 Python 3.12. Команды выполняются из корня репозитория. Окружение и временные файлы
@@ -32,13 +37,13 @@ python -m venv .venv
 Повторить прогноз из сохранённой модели на историческом примере:
 
 ```powershell
-python -m pipetwin.pipeline predict --bundle artifacts/run-001/bundles/between.joblib --spec configs/example_prediction.yaml --output artifacts/replay.csv
+.venv/Scripts/python.exe -m pipetwin.pipeline predict --bundle artifacts/run-001/bundles/between.joblib --spec configs/example_prediction.yaml --output artifacts/replay.csv
 ```
 
 При получении официального шаблона и согласовании дат/сетки:
 
 ```powershell
-python -m pipetwin.pipeline export --predictions artifacts/selected-official-predictions.csv --template sample_result.csv --output artifacts/result.csv
+.venv/Scripts/python.exe -m pipetwin.pipeline export --predictions artifacts/selected-official-predictions.csv --template sample_result.csv --output artifacts/result.csv
 ```
 
 Экспорт требует точного совпадения ключей, единственности строк и конечных неотрицательных
