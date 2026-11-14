@@ -67,4 +67,4 @@ unconfirmed_physical_channels:
   gas_content_rate: fraction_supported_by_numerical_identity
   chemistry_and_coupon_rates: require_method_units_mapping_and_availability
 
-reference: docs/units-and-dimensions.md
+reference: docs/data-quality.md

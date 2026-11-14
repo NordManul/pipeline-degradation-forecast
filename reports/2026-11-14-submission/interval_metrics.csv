@@ -1,9 +1,0 @@
-scenario,calibration,coverage_80,mean_width_mm,n,fallback_n
-case1_late_by_section,historical,0.7169811320754716,1.1139233068500143,53,0
-case1_late_by_section,cross_calibration_on_transfer,0.7547169811320755,1.106735173925889,53,48
-case1_late_100m_buffered,historical,0.7169811320754716,1.1139233068500143,53,0
-case1_late_100m_buffered,cross_calibration_on_transfer,0.7735849056603774,1.042805972497057,53,0
-case2_MAIN-2,other_transfer_direction_diagnostic,0.2768762677484787,0.5629860496939924,986,0
-case2_MAIN-2,cross_calibration_on_transfer,0.6288032454361054,1.3068844319993582,986,0
-case2_MAIN-3,other_transfer_direction_diagnostic,0.925531914893617,1.3477978400025825,94,0
-case2_MAIN-3,cross_calibration_on_transfer,0.776595744680851,0.5965617561624186,94,0

@@ -73,17 +73,3 @@ def score_predictions(frame, predictions, split):
             raise ValueError(f"Model {name} must predict every requested cell with finite values")
         records.append({"split": split, "model": name, **regression_metrics(frame.loc[observed, "y_mm"], values[observed])})
     return pd.DataFrame(records)
-
-
-def select_champion(leaderboard):
-    """Fixed rule: positive signed r, then Pearson squared, then MAE.
-
-    If all correlations are undefined/non-positive, choose the lowest MAE.
-    Only development OOF metrics may be passed to this function.
-    """
-    if leaderboard.empty or not leaderboard["split"].eq("development").all():
-        raise ValueError("Selection must use development scores only")
-    eligible = leaderboard.loc[leaderboard.pearson_r.gt(0)]
-    if eligible.empty:
-        return leaderboard.sort_values(["mae_mm", "model"]).iloc[0]["model"]
-    return eligible.sort_values(["pearson_squared", "mae_mm", "model"], ascending=[False, True, True]).iloc[0]["model"]

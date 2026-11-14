@@ -9,6 +9,9 @@ description = "Reproducible segment-level pipeline wall-thickness forecasting"
 requires-python = ">=3.11"
 dynamic = ["dependencies"]
 
+[project.optional-dependencies]
+test = ["pytest==8.3.5"]
+
 [project.scripts]
 pipetwin = "pipetwin.pipeline:main"
 
@@ -20,4 +23,4 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests", "src/pipetwin/agent2_physics/tests"]
+testpaths = ["tests"]

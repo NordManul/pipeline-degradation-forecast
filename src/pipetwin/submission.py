@@ -46,29 +46,5 @@ def export_submission(predictions, template, output):
     if output.exists():
         raise ValueError("Output already exists; choose a new submission path")
     output.parent.mkdir(parents=True, exist_ok=True)
-    result.to_csv(output, index=False, float_format="%.8f")
+    result.to_csv(output, index=False, float_format="%.8f", lineterminator="\r\n")
     return result
-
-
-def assemble_cases(case1_path, case2_path, data_dir, output, template_path=None, case1_column="combined_context"):
-    """Combine the selected strict case 1 and retrospective case 2 forecasts."""
-    from .geometry import build_grid
-    from .quality import load_case_sources
-
-    frames, grids = [], []
-    for name, path, column in [("case1", case1_path, case1_column), ("case2", case2_path, "thickness_pred")]:
-        cleaned = load_case_sources(data_dir, name)
-        spec = cleaned.contract["cases"][name]
-        grid = build_grid(cleaned.sources.passport, cleaned.contract["geometry"]["segment_length_m"])
-        grids.append(grid.loc[grid.id.eq(spec["id"]), KEYS])
-        frame = pd.read_csv(path, dtype={"id": str})
-        if not frame.id.eq(spec["id"]).all() or not pd.to_datetime(frame.target_date).eq(cleaned.cutoff).all():
-            raise ValueError(f"Wrong section or date in {name} forecast")
-        if not frame[column].between(0, spec["nominal_mm"]).all():
-            raise ValueError(f"Thickness outside audited bounds in {name}")
-        frames.append(frame[KEYS + [column]].rename(columns={column: "thickness_pred"}))
-    predictions = pd.concat(frames, ignore_index=True)
-    passport_keys = pd.concat(grids, ignore_index=True)
-    validate_submission(predictions, passport_keys)
-    template = pd.read_csv(template_path, dtype={"id": str}) if template_path else passport_keys
-    return export_submission(predictions, template, output)

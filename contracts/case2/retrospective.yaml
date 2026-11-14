@@ -1,15 +1,11 @@
-protocol: case2_retrospective_v1
-authority: user_confirmed_later_labels_on_other_pipelines_allowed
-supersedes: strict_case2_fit_policy_only_for_case2_transfer_command
-case_id: case2
+protocol: case2_retrospective
+authority: user_confirmed_later_labels_on_other_mains_allowed
 target_main: MAIN-4
-inference_cutoff_exclusive: '2022-07-01T00:00:00'
-# Fixed freeze of this supplied snapshot, separate from query time.
-pool_cutoff_exclusive: '2025-01-01T00:00:00'
+inference_cutoff_exclusive: "2022-07-01T00:00:00"
+# Freeze of the supplied donor snapshot, separate from query time.
+pool_cutoff_exclusive: "2025-01-01T00:00:00"
 target_main_labels: excluded_at_all_dates
 donor_feature_cutoff: strictly_before_each_donor_inspection
 query_feature_cutoff: strictly_before_query_date
-missing_vtd: unknown
 validation: hold_out_entire_main_including_all_campaigns
-validation_related_directions: MAIN-3_and_MAIN-4_share_DIR-3
 unresolved_metal_epochs: [MAIN-1]

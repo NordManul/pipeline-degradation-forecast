@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .sources import FILES, PASSPORT_COLUMNS, Sources, read_config
+from .sources import FILES, PASSPORT_COLUMNS, Sources
 
 
 AUDIT_COLUMNS = ["case_id", "source_file", "source_row_id", "source_sha256",
@@ -314,9 +314,3 @@ def _clean_as_of(raw, case_id, contract, target_contract, cutoff, manifest, *, d
     ultrasound, coupons = _auxiliary(raw, passport, cutoff, audit)
     sources = Sources(passport, profile, regime, inspection, ultrasound, coupons, manifest or {})
     return CleanedSources(sources, audit.table(), case_id, cutoff, contract)
-
-
-def load_case_sources(data_dir, case_id, contracts_dir="contracts", target_contract_path="configs/data_contract.yaml"):
-    contract = read_config(Path(contracts_dir) / "cases.yaml")
-    raw, manifest = read_raw_sources(data_dir)
-    return clean_sources(raw, case_id, contract, read_config(target_contract_path), manifest)

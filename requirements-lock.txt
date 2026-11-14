@@ -16,7 +16,7 @@ pandas==2.2.3
 pillow==13.0.0
 plotly==7.1.0
 pluggy==1.7.0
-pyparsing==3.3.3
+pyparsing==3.2.3
 pytest==8.3.5
 python-dateutil==4.0.0
 pytz==2026.6

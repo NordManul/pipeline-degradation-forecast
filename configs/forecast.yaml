@@ -1,7 +1,4 @@
 seed: 42
-data_dir: data/raw
-contract: configs/data_contract.yaml
-output_dir: artifacts
 development:
   ids: ["1250009490", "1250022871", "1250011604"]
   anchor_date: "2018-09-23"
@@ -10,13 +7,8 @@ late:
   ids: ["1250009490", "1250011604"]
   anchor_date: "2022-07-06"
   target_date: "2023-12-01"
-cold_train:
-  ids: ["1250009490", "1250022871", "1250011604"]
-  target_date: "2018-09-23"
-cold_test:
-  ids: ["1250009584", "1250009587", "1250028931", "1250028932", "1250028933", "1250028934", "1250028935"]
-  target_date: "2023-08-12"
-# Audit-derived geometry used only for blocked validation and plotting.
+  label_pool_cutoff_exclusive: "2025-01-01"
+# Offsets in metres for the common four-block split along MAIN-2.
 section_offsets_m:
   "1250009490": 0.0
   "1250022871": 44.7
@@ -24,8 +16,3 @@ section_offsets_m:
 folds: 4
 spatial_buffer_m: 100.0
 history_radius_m: 50.0
-models: [persistence, smooth_persistence, global_rate, local_rate, ridge, ridge_direct, huber, gam, random_forest, catboost, physics, physics_residual, e02_mode, e02_water, e02_thermal, e02_terrain]
-ensemble_candidates: [persistence, ridge, catboost, physics]
-# Assessment is exploratory on reported labels and local simple-section bins.
-# Historical diagnostic dates, not the official cases in contracts/cases.yaml.
-# This benchmark includes data forbidden for official case2 (target 2022-07-01).

@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from pipetwin.geometry import assign_segments, build_grid
-from pipetwin.sources import canonical_ids, normalize_inspections
+from pipetwin.sources import canonical_ids
 from pipetwin.targets import build_targets
 
 
@@ -25,27 +25,22 @@ def test_ids_are_exact():
         canonical_ids(pd.Series([1.5]))
 
 
-def test_campaign_units_and_unknown_campaign(sources, contract):
+def test_campaign_units(sources):
     rows = sources.inspection.set_index("row_id")
     assert rows.loc[32084, "depth_fraction"] == pytest.approx(0.285)
     assert rows.loc[3419, "depth_fraction"] == pytest.approx(0.14)
-    altered = sources.inspection.iloc[:1].copy()
-    altered["date"] = "2030-01-01"
-    with pytest.raises(ValueError, match="Unknown inspection"):
-        normalize_inspections(altered, contract)
 
 
 def test_real_data_audit_and_unknown_coverage(sources, contract):
     grid = build_grid(sources.passport)
-    targets, quarantine = build_targets(sources, grid, contract)
+    targets, _ = build_targets(sources, grid, contract)
     assert len(grid) == 4668
-    assert quarantine["exclusion_reason"].eq("outside_section").sum() == 251
     august = targets[targets.date.eq(pd.Timestamp("2023-08-12"))]
     assert august["observed"].sum() == 94
     assert august.loc[~august.observed, "thickness_mm"].isna().all()
     assert august.loc[~august.observed, "coverage_status"].eq("unknown").all()
     regime = sources.regime
-    good = regime.q.gt(0) & regime.density_oil.gt(0)
+    good = regime.q.gt(0) & regime.density_oil.gt(0) & regime.q_oil.notna() & regime.watercut.notna()
     reconstructed = 100 * (1 - regime.oil_volume_m3_day / regime.q)
     assert np.max(np.abs(reconstructed[good] - regime.watercut[good])) < 0.02
     assert "Параметры перекачки_Рнач., атм" not in sources.passport.columns

@@ -10,7 +10,7 @@ from pipetwin.features import attach_labels, build_snapshot, feature_columns
 from pipetwin.geometry import build_grid
 from pipetwin.sources import read_config
 from pipetwin.targets import build_targets
-from pipetwin.validation import blocked_folds, regression_metrics, score_predictions, select_champion
+from pipetwin.validation import blocked_folds, regression_metrics, score_predictions
 from conftest import ROOT
 
 
@@ -38,8 +38,11 @@ def test_target_and_future_regime_cannot_change_features(sources, snapshots):
 
 def test_cold_start_has_no_inspection_inputs(sources, snapshots):
     config, grid, targets = snapshots
-    before = build_snapshot(sources, grid, targets, config["cold_test"], config)
-    after = build_snapshot(sources, grid, targets.iloc[:0], config["cold_test"], config)
+    date = "2023-08-12"
+    ids = sorted(targets.loc[targets.date.eq(date), "id"].unique())
+    spec = {"ids": ids, "target_date": date}
+    before = build_snapshot(sources, grid, targets, spec, config)
+    after = build_snapshot(sources, grid, targets.iloc[:0], spec, config)
     pd.testing.assert_frame_equal(before, after)
     assert not any("anchor" in value or "neighbor" in value for value in feature_columns("cold"))
     labelled = attach_labels(before, targets)
@@ -66,6 +69,4 @@ def test_signed_correlation_constants_and_identical_metric_mask():
     frame = pd.DataFrame({"y_mm": [1, np.nan, 3], "observed": [True, False, True]})
     result = score_predictions(frame, {"a": [1, 4, 3], "b": [3, 4, 1]}, "development")
     assert result.n.tolist() == [2, 2]
-    assert select_champion(result) == "a"
-    with pytest.raises(ValueError, match="development"):
-        select_champion(result.assign(split="late"))
+    assert result.pearson_r.tolist() == pytest.approx([1, -1])
