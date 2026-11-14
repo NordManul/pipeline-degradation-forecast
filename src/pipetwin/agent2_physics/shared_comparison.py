@@ -167,7 +167,10 @@ def run(prepared_dir, output_dir, contracts_dir="contracts", *, configs=None, ca
                     write_json(directory / "residual_guard_diagnostics.json", guard_diagnostics)
                     runs.append({"case_id": case_id, "missing_policy": policy, "variant": variant,
                                  "elapsed_seconds": elapsed, "serialization_csv_errors_mm": replay_errors})
-                    del bundle, raw, bounded
+                    # Loop variables retain the last estimator even after the
+                    # bundle is deleted. Release its full exposure before the
+                    # next shared run allocates models and serialization replay.
+                    del bundle, model, raw, bounded, query, part
                     gc.collect()
         for name, parts in tables.items():
             extension = ".csv.gz" if name.endswith("predictions") else ".csv"
