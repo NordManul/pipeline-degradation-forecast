@@ -25,6 +25,7 @@ DEFAULT_OPTIONS = {
     "rate_regularization": 0.25,
     "robust_delta_mm": 0.5,
     "residual_alpha": 100.0,
+    "scale_regularization": 1.0,
     "max_nfev": 2000,
 }
 
@@ -38,7 +39,7 @@ def parse_options(options):
     result = {**DEFAULT_OPTIONS, **supplied}
     if result["missing_policy"] not in {"observed-only", "train-median"}:
         raise ValueError("missing_policy must be observed-only or train-median")
-    for key in ["rate_regularization", "robust_delta_mm", "residual_alpha"]:
+    for key in ["rate_regularization", "robust_delta_mm", "residual_alpha", "scale_regularization"]:
         value = result[key]
         if isinstance(value, (str, bool)) or not np.isfinite(value) or value <= 0:
             raise ValueError(f"{key} must be finite and positive")
@@ -70,7 +71,7 @@ class PhysicsEstimator:
 
     def __init__(self, name, *, scenario, exposure, cutoff_exclusive,
                  feature_columns, seed=42, options=None):
-        if name not in {"constant_rate", "positive_rate", "hybrid_residual"}:
+        if name not in {"constant_rate", "positive_rate", "hybrid_residual", "hybrid_scale"}:
             raise ValueError(f"Unknown or unimplemented physical model: {name}")
         if scenario not in {"between", "cold"}:
             raise ValueError("scenario must be between or cold")
@@ -81,8 +82,8 @@ class PhysicsEstimator:
         self.name, self.scenario = name, scenario
         self.cutoff = timestamp(cutoff_exclusive)
         self.feature_columns = validate_features(feature_columns, scenario)
-        if name == "hybrid_residual" and not self.feature_columns:
-            raise ValueError("hybrid_residual requires explicit correction features")
+        if name in {"hybrid_residual", "hybrid_scale"} and not self.feature_columns:
+            raise ValueError(f"{name} requires explicit correction features")
         self.seed, self.options = int(seed), parse_options(options)
         # A caller's later edits cannot mutate the model's case context.
         self.exposure = exposure.copy(deep=True)
@@ -103,6 +104,10 @@ class PhysicsEstimator:
         rates = np.exp(self.rate_parameters_[0] + self._rate_matrix(history) @ self.rate_parameters_[1:])
         losses = integrate_loss(history, rates, self.options["missing_policy"])
         return frame.exposure_id.map(losses).to_numpy(dtype=float)
+
+    def _scale_matrix(self, frame):
+        matrix = self.scale_transformer_.transform(feature_matrix(frame, self.feature_columns))
+        return np.column_stack([np.ones(len(frame)), np.clip(matrix, -5, 5)])
 
     def fit(self, frame, y_mm):
         self._fitted = False
@@ -147,6 +152,7 @@ class PhysicsEstimator:
         loss = self._loss(train, history)
         physics = np.maximum(0, initial - loss)
         correction_diagnostics = None
+        scale_diagnostics = None
         if self.name == "hybrid_residual":
             self.correction_ = make_pipeline(
                 SimpleImputer(strategy="median", add_indicator=True, keep_empty_features=True),
@@ -157,6 +163,23 @@ class PhysicsEstimator:
             estimator = self.correction_[-1]
             correction_diagnostics = {"unit": "mm/year", "intercept": float(estimator.intercept_),
                                       "coefficients": estimator.coef_.tolist()}
+        if self.name == "hybrid_scale":
+            self.scale_transformer_ = make_pipeline(
+                SimpleImputer(strategy="median", add_indicator=True, keep_empty_features=True),
+                StandardScaler())
+            self.scale_transformer_.fit(feature_matrix(train, self.feature_columns))
+            scale_matrix = self._scale_matrix(train)
+
+            def scale_residual(coefficients):
+                multiplier = np.exp(np.clip(scale_matrix @ coefficients, -5, 5))
+                prediction = np.maximum(0, initial - loss * multiplier)
+                errors = robust_residual(prediction - y, self.options["robust_delta_mm"]) / np.sqrt(len(train))
+                return np.r_[errors, np.sqrt(self.options["scale_regularization"]) * coefficients]
+
+            self.scale_parameters_, scale_status = optimize(
+                scale_residual, np.zeros(scale_matrix.shape[1]), (-2.0, 2.0), self.options["max_nfev"])
+            scale_diagnostics = {"coefficients": self.scale_parameters_.tolist(),
+                                 "optimizer": scale_status, "log_multiplier_bounds": [-5.0, 5.0]}
         self.diagnostics_ = {
             "model": self.name, "scenario": self.scenario, "contract_version": CONTRACT_VERSION,
             "cutoff_exclusive": self.cutoff.isoformat(), "timezone": "Europe/Moscow",
@@ -170,6 +193,7 @@ class PhysicsEstimator:
             "feature_columns": list(self.feature_columns),
             "rate_parameters": self.rate_parameters_.tolist(), "optimizer": status,
             "residual_correction": correction_diagnostics, "last_predict_fallback_rows": 0,
+            "scale_correction": scale_diagnostics,
             "physical_lower_bound_mm": 0, "shared_final_clipping_applied": False,
             "rate_log_intercept_bounds": [-18.0, float(np.log(10.0))],
             "rate_coefficient_bounds": [-2.0, 2.0], "standardized_channel_bounds": [-5.0, 5.0],
@@ -196,6 +220,8 @@ class PhysicsEstimator:
         if eligible.any():
             active = data.frame.loc[eligible]
             loss[eligible] = self._loss(active, data.exposure)
+            if self.name == "hybrid_scale":
+                loss[eligible] *= np.exp(np.clip(self._scale_matrix(active) @ self.scale_parameters_, -5, 5))
             physical[eligible] = np.maximum(0, data.initial[eligible] - loss[eligible])
             prediction[eligible] = physical[eligible]
             if self.name == "hybrid_residual":

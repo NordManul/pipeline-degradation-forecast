@@ -8,11 +8,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipetwin.agent2_physics.adapter import REQUIRED_MODEL_NAMES, make_model
+from pipetwin.agent2_physics.adapter import REQUIRED_MODEL_NAMES, OPTIONAL_MODEL_NAMES, make_model
 from pipetwin.agent2_physics.validation import DAYS_PER_YEAR, RATE_COLUMNS, integrate_loss
 
 
 CUTOFF = "2022-07-01"
+MODEL_NAMES = REQUIRED_MODEL_NAMES + OPTIONAL_MODEL_NAMES
 
 
 def history(key, start, end, water=0.3):
@@ -59,7 +60,7 @@ def labels(frame, scenario="between"):
     return initial - 0.2 * frame.horizon_years.to_numpy()
 
 
-@pytest.mark.parametrize("name", REQUIRED_MODEL_NAMES)
+@pytest.mark.parametrize("name", MODEL_NAMES)
 @pytest.mark.parametrize("scenario", ["between", "cold"])
 def test_public_api_permutation_diagnostics_and_serialization(canonical, name, scenario):
     train, query, exposure = canonical
@@ -93,7 +94,7 @@ def test_daily_units_leap_year_and_separate_histories_of_same_id(canonical):
     np.testing.assert_allclose(model.predict(combined), labels(combined), atol=1e-5)
 
 
-@pytest.mark.parametrize("name", REQUIRED_MODEL_NAMES)
+@pytest.mark.parametrize("name", MODEL_NAMES)
 def test_preprocessing_uses_only_unique_train_histories(canonical, name):
     train, query, exposure = canonical
     reference = estimator(name, exposure).fit(train, labels(train))
@@ -116,7 +117,7 @@ def test_preprocessing_uses_only_unique_train_histories(canonical, name):
         model.predict(query)
 
 
-@pytest.mark.parametrize("name", REQUIRED_MODEL_NAMES)
+@pytest.mark.parametrize("name", MODEL_NAMES)
 def test_unobserved_anchors_never_calibrate_and_fallback_is_exact(canonical, name):
     train, query, exposure = canonical
     reference = estimator(name, exposure).fit(train, labels(train))
@@ -144,7 +145,7 @@ def test_no_observed_training_anchor_is_an_explicit_error(canonical):
         estimator("positive_rate", exposure).fit(train.assign(anchor_observed=False), labels(train))
 
 
-@pytest.mark.parametrize("name", REQUIRED_MODEL_NAMES)
+@pytest.mark.parametrize("name", MODEL_NAMES)
 def test_cold_ignores_all_previous_inspection_columns_and_other_case_models(canonical, name):
     train, query, exposure = canonical
     cold_train, cold_query = train.assign(scenario="cold"), query.assign(scenario="cold")
@@ -170,7 +171,7 @@ def test_target_and_metadata_allowlist_is_rejected(canonical, column):
         estimator("hybrid_residual", canonical[2], columns=[column])
 
 
-@pytest.mark.parametrize("name", REQUIRED_MODEL_NAMES)
+@pytest.mark.parametrize("name", MODEL_NAMES)
 def test_prediction_never_reads_diagnostic_labels(canonical, name):
     train, query, exposure = canonical
     model = estimator(name, exposure).fit(train, labels(train))
@@ -201,7 +202,7 @@ def test_constant_rate_is_robust_to_a_large_measurement_residual(canonical):
     assert np.exp(model.rate_parameters_[0]) == pytest.approx(0.2, abs=0.01)
 
 
-@pytest.mark.parametrize("name", REQUIRED_MODEL_NAMES)
+@pytest.mark.parametrize("name", MODEL_NAMES)
 def test_missing_scenarios_differ_and_zero_velocity_is_still_observed(canonical, name):
     train, query, exposure = canonical
     held = exposure.exposure_id.eq("query")
@@ -377,3 +378,18 @@ def test_unknown_history_has_explicit_identifiability_limits(canonical):
         estimator("positive_rate", exposure, missing_policy="train-median").fit(train, labels(train))
     constant = estimator("constant_rate", exposure, missing_policy="train-median").fit(train, labels(train))
     np.testing.assert_allclose(constant.predict(query), labels(query), atol=1e-5)
+
+
+@pytest.mark.parametrize("scenario", ["between", "cold"])
+def test_scale_is_positive_train_fitted_and_keeps_physical_monotonicity(canonical, scenario):
+    train, query, exposure = canonical
+    train, query = train.assign(scenario=scenario), query.assign(scenario=scenario)
+    y = labels(train, scenario) - 0.15 * train.safe_feature.to_numpy()
+    model = estimator("hybrid_scale", exposure, scenario).fit(train, y)
+    prediction = model.predict(query)
+    initial = query["anchor_mm" if scenario == "between" else "nominal_mm"].to_numpy()
+    assert (prediction <= initial).all() and (prediction >= 0).all()
+    assert prediction[0] > prediction[-1] + 0.001
+    assert (model.last_prediction_.integrated_loss_mm >= 0).all()
+    assert model.diagnostics_["scale_correction"]["optimizer"]["success"]
+    assert np.linalg.norm(model.scale_parameters_) > 0
