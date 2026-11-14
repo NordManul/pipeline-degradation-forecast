@@ -1,0 +1,18 @@
+{
+  "case1_interval_calibration": "strict_2022_spatial_oof",
+  "case2_interval_calibration": "retrospective_leave_main_out",
+  "case1_residual_quantiles_mm": [
+    -0.5600000000000005,
+    0.553923306850014
+  ],
+  "case1_experimental_same_day_late_quantiles_mm": [
+    -0.8909352764401259,
+    0.1488068401570075
+  ],
+  "case2_residual_quantiles_mm": [
+    -0.5253450898438206,
+    1.0143671811791626
+  ],
+  "case1_anchored_labels": 357,
+  "case1_negative_observed_loss": 177
+}
