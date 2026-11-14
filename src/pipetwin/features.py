@@ -45,6 +45,8 @@ def _profile_features(frame, profile, radius_m):
 
 def _regime_features(regime, start, end):
     eligible = regime.loc[regime.date.ge(start) & regime.date.lt(end)].copy()
+    if "available_at" in eligible:
+        eligible = eligible.loc[eligible.available_at.lt(end)].copy()
     # Repeated intraday records represent one day, with the last available record retained.
     eligible["day"] = eligible["date"].dt.normalize()
     daily = eligible.sort_values("date").drop_duplicates("day", keep="last")
@@ -107,7 +109,8 @@ def build_snapshot(sources, grid, targets, spec, config):
         regime = sources.regime.loc[sources.regime.id.eq(section_id)]
         for key, value in _regime_features(regime, start, end).items():
             frame[key] = value
-        e02 = mode_features(regime.assign(calc_date=regime.date), pd.Series([section_id]), start, end).iloc[0]
+        e02 = mode_features(regime.assign(calc_date=regime.date), pd.Series([section_id]), start, end,
+                            temperature_policy=config.get("temperature_policy", "legacy_positive")).iloc[0]
         for key, value in e02.items():
             if key != "id":
                 frame["e02_" + key] = value
@@ -149,7 +152,10 @@ def build_snapshot(sources, grid, targets, spec, config):
 
 
 def attach_labels(snapshot, targets):
-    labels = targets[["id", "segment_id", "date", "thickness_mm", "coverage_status"]].rename(
+    columns = ["id", "segment_id", "date", "thickness_mm", "coverage_status"]
+    if "label_available_at" in targets:
+        columns.append("label_available_at")
+    labels = targets[columns].rename(
         columns={"date": "target_date", "thickness_mm": "y_mm"}
     )
     result = snapshot.merge(labels, on=["id", "segment_id", "target_date"], how="left", validate="one_to_one")

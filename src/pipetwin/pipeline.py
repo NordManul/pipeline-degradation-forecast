@@ -205,6 +205,11 @@ def run_prediction(bundle_path, spec_path, output_path, raw_dir=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    preparation = sub.add_parser("prepare-cases", help="Clean and prepare both official case inputs without future data")
+    preparation.add_argument("--data-dir", default="data/raw")
+    preparation.add_argument("--contracts-dir", default="contracts")
+    preparation.add_argument("--config", default="configs/forecast.yaml")
+    preparation.add_argument("--output", required=True)
     benchmark = sub.add_parser("benchmark", help="Run all historical comparisons and charts")
     benchmark.add_argument("--config", default="configs/forecast.yaml")
     benchmark.add_argument("--output", required=True)
@@ -219,7 +224,11 @@ def main(argv=None):
     export.add_argument("--output", required=True)
     args = parser.parse_args(argv)
     try:
-        if args.command == "benchmark":
+        if args.command == "prepare-cases":
+            from .case_data import prepare_cases
+            summaries = prepare_cases(args.data_dir, args.output, args.contracts_dir, args.config)
+            print(pd.DataFrame(summaries).to_string(index=False))
+        elif args.command == "benchmark":
             metrics, selection = run_benchmark(args.config, args.output)
             print(metrics.to_string(index=False))
             print(f"Report: {Path(args.output).resolve() / 'report.html'}")
