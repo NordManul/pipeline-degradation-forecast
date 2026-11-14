@@ -2,7 +2,7 @@
 
 ```powershell
 python -m pipetwin.pipeline prepare-cases --output artifacts/official-inputs-20261114-v2
-python -m pipetwin.pipeline case-benchmark --prepared artifacts/official-inputs-20261114-v2 --output artifacts/official-benchmark-20261114-v1
+python -m pipetwin.pipeline case-benchmark --prepared artifacts/official-inputs-20261114-v2 --output artifacts/official-benchmark-20261114-v2
 ```
 
 Обе команды отказываются перезаписывать существующую папку. Запуск публикуется
@@ -10,8 +10,10 @@ python -m pipetwin.pipeline case-benchmark --prepared artifacts/official-inputs-
 загрузки всех моделей. При изменении YAML-контрактов подготовку нужно повторить.
 
 Общие фолды и цели берутся из `prepared.joblib`. Нового разбиения для удобства
-конкретной модели нет. Fit получает только наблюдаемые цели. Основные warm-модели
+конкретной модели нет. Fit получает только наблюдаемые цели. Warm-модели скорости
 обучаются на измеренных якорях; пакет агента проверяет это внутри своего fit.
+Прямые модели толщины (`ridge_direct`, E02) используют все валидные train-цели:
+для их обучающей цели не требуется вычитать ненаблюдаемый якорь.
 Все warm-модели используют один train-only fallback на строках без якоря.
 Это уточнение нового benchmark; прежние исторические результаты не смешиваются с ним.
 

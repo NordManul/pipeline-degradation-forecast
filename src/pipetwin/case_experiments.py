@@ -114,7 +114,8 @@ def fit_case_model(name, package, train, fallback, config, *, matched=None):
         raise ValueError("Training labels violate the case cutoff")
     # Root rate learners must not invent rates from nominal anchor placeholders.
     # Agent2 performs this check internally and reports its omitted-anchor count.
-    eligible = observed.loc[observed.anchor_observed] if scenario == "between" else observed
+    direct_target = name == "ridge_direct" or name.startswith("e02_")
+    eligible = observed.loc[observed.anchor_observed] if scenario == "between" and not direct_target else observed
     started = perf_counter()
     if name.startswith("e04_"):
         if scenario != "between" or matched is None:
@@ -286,7 +287,6 @@ def run_case(package, config, output, matching_sources=None):
 
 def run_case_benchmark(prepared_dir, output_dir, config_path="configs/case_benchmark.yaml", contracts_dir="contracts", data_dir="data/raw"):
     from .pipeline import write_json
-    from .case_reporting import create_case_report
     prepared, output = Path(prepared_dir).resolve(), Path(output_dir).resolve()
     config = read_config(config_path)
     if output.exists():
@@ -301,6 +301,7 @@ def run_case_benchmark(prepared_dir, output_dir, config_path="configs/case_bench
         raise ValueError("Contracts changed since preparation; run prepare-cases again")
     output.parent.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("MPLCONFIGDIR", str(output.parent / ".matplotlib"))
+    from .case_reporting import create_case_report
     source = Path(__file__).resolve().parent
     provenance = {"created_utc": datetime.now(timezone.utc), "python": platform.python_version(),
                   "git_commit": subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip(),

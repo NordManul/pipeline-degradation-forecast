@@ -8,6 +8,7 @@ import pytest
 
 from pipetwin.case_data import model_views, prepare_case
 from pipetwin.case_experiments import fit_case_model, predict_models, run_case, validate_package
+from pipetwin.features import feature_columns
 from pipetwin.quality import load_case_sources
 from pipetwin.sources import read_config
 
@@ -98,3 +99,17 @@ def test_complete_run_shared_keys_metrics_fixed_blend_and_reload(package, config
     np.testing.assert_allclose(selected.thickness_pred, bounded[selection["model"]])
     assert bundle["cutoff_exclusive"] == package["cutoff_exclusive"]
     assert set(raw) == set(bounded) == {"ridge", "global_rate", "blend"}
+
+
+@pytest.mark.parametrize("name", ["ridge_direct", "e02_terrain"])
+def test_direct_thickness_fit_can_use_valid_targets_without_old_anchor(package, config, name):
+    warm = deepcopy(package)
+    warm["scenario"] = "between"
+    train, _, fallback = model_views(warm)
+    train["scenario"] = "between"
+    train["anchor_observed"] = False
+    for column in feature_columns("between"):
+        if column not in train:
+            train[column] = 0.
+    _, info = fit_case_model(name, warm, train, fallback, config)
+    assert info["diagnostics"]["fit_rows"] == 372
