@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 from threadpoolctl import threadpool_limits
 
+from .diagnostics import input_shift, prediction_diagnostics
 from .experiments import cross_validate, fit_models, group_metrics, predict_models, prediction_table
 from .features import attach_labels, build_snapshot
 from .geometry import build_grid
@@ -88,7 +89,7 @@ def _run_benchmark(config, output):
     coverage = targets.groupby(["main_id", "date"], as_index=False).agg(cells=("observed", "size"), observed=("observed", "sum"))
     coverage.to_csv(output / "coverage.csv", index=False)
     prepared, selection, scores, per_group, per_fold, intervals, split_audit = {}, {}, [], [], [], {}, {}
-    prediction_tables = {}
+    prediction_tables, training_frames, shifts, saturations = {}, {}, [], []
     # Complete selection/calibration for both scenarios before accessing their test labels.
     for scenario, key in [("between", "development"), ("cold", "cold_train")]:
         snapshot = build_snapshot(sources, grid, targets, config[key], config)
@@ -118,6 +119,7 @@ def _run_benchmark(config, output):
             "development_score": ranking.loc[ranking.model.eq(champion)].iloc[0].to_dict(),
         }
         prepared[scenario] = bundle
+        training_frames[scenario] = frame
         residuals = pd.DataFrame({name: frame.loc[observed, "y_mm"].to_numpy() - values[observed] for name, values in cv.predictions.items()})
         residuals.corr().to_csv(output / f"{scenario}_residual_correlations.csv")
         print(f"{scenario}: frozen selection = {champion}", flush=True)
@@ -128,6 +130,8 @@ def _run_benchmark(config, output):
     for scenario, key, split in [("between", "late", "late"), ("cold", "cold_test", "cold_test")]:
         bundle = prepared[scenario]
         frame = attach_labels(build_snapshot(sources, grid, targets, config[key], config), targets)
+        shifts.append(input_shift(training_frames[scenario], frame, scenario, split))
+        saturations.append(prediction_diagnostics(bundle["models"], frame, split))
         predictions = predict_models(bundle["models"], frame, bundle["candidates"], bundle["weights"])
         scores.append(score_predictions(frame, predictions, split))
         per_group.append(group_metrics(frame, predictions, split))
@@ -150,6 +154,8 @@ def _run_benchmark(config, output):
     pd.concat(per_fold, ignore_index=True).to_csv(output / "metrics_by_fold.csv", index=False)
     pd.concat(selected_tables, ignore_index=True).to_csv(output / "selected_predictions.csv", index=False)
     write_json(output / "intervals.json", intervals)
+    pd.concat(shifts, ignore_index=True).to_csv(output / "feature_shift.csv", index=False)
+    pd.concat(saturations, ignore_index=True).to_csv(output / "prediction_diagnostics.csv", index=False)
     from .reporting import create_report
     create_report(output, metrics, prediction_tables, selection, coverage, intervals)
     return metrics, selection
@@ -177,6 +183,8 @@ def run_prediction(bundle_path, spec_path, output_path, raw_dir=None):
     if raw_dir:
         config["data_dir"] = str(raw_dir)
     _, sources, grid, targets, _ = load_data(config)
+    if read_config(config["contract"]) != bundle["contract"]:
+        raise ValueError("Data contract changed since training; retrain or restore the original contract")
     spec = read_config(spec_path)
     expected = "between" if "anchor_date" in spec else "cold"
     if bundle["scenario"] != expected:

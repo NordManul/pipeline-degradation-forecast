@@ -161,7 +161,14 @@ def create_report(output, metrics, tables, selection, coverage, intervals):
     lines += ["", "## Графики", ""] + [f"![{name}](plots/{name})\n" for name in plots]
     (output / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     images = "\n".join(f'<figure><img alt="{escape(name)}" src="data:image/png;base64,{base64.b64encode((output / "plots" / name).read_bytes()).decode()}"></figure>' for name in plots)
-    notes = " ".join(lines[12:25])
+    notes = (
+        "Результаты относятся к исторической реконструкции и наблюдаемым целям. "
+        "Cold test содержит 94 размеченные ячейки из 2185; большинство записей — производственные дефекты. "
+        "Официальные ID, даты, сетка и политика целей пока не подтверждены. "
+        "Поздние кампании уже проходили аудит и исследовательскую оценку; это не новый слепой тест. "
+        "Интервалы по OOF-остаткам не гарантируют 80% покрытия при переносе. "
+        "Сдвиг признаков и насыщение прогнозов записаны в feature_shift.csv и prediction_diagnostics.csv."
+    )
     html = f'''<!doctype html><html lang="ru"><meta charset="utf-8"><title>PipeTwin — исторический эксперимент</title>
 <style>body{{max-width:1400px;margin:32px auto;padding:0 24px;font:16px/1.55 system-ui;color:#18304a;background:#f5f7fb}}h1{{font-size:30px}}table{{border-collapse:collapse;background:white;font-size:14px}}td,th{{padding:8px 12px;border:1px solid #dae1eb;text-align:right}}figure{{margin:24px 0;background:white;border-radius:12px;padding:12px}}img{{width:100%;height:auto}}.note{{padding:18px;background:#e7edf7;border-radius:10px}}</style>
 <h1>PipeTwin: сравнение моделей на исторических данных</h1>

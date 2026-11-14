@@ -25,7 +25,8 @@ python -m venv .venv
 Каталог запуска должен быть новым. Результат публикуется только после успешного завершения.
 Внутри: `report.html` (самодостаточный отчёт с графиками), `summary.md`, `metrics.csv`,
 `metrics_by_fold.csv`, `metrics_by_section.csv`, `predictions/`, `bundles/`, `selection.json`,
-`provenance.json`, `spatial_folds.json`, `coverage.csv`, `quarantine.csv` и `intervals.json`.
+`provenance.json`, `spatial_folds.json`, `coverage.csv`, `quarantine.csv`, `intervals.json`,
+`feature_shift.csv` и `prediction_diagnostics.csv`.
 Предсказания всех моделей сохраняются для всей сетки, метрики — только на наблюдаемых целях.
 
 Повторить прогноз из сохранённой модели на историческом примере:
@@ -50,7 +51,7 @@ python -m pipetwin.pipeline export --predictions artifacts/selected-official-pre
 | --- | --- |
 | Контроли | persistence, smooth_persistence, global_rate, local_rate |
 | ML | ridge (скорость), ridge_direct (толщина), huber, gam, random_forest, catboost |
-| Экспозиция | physics (неотрицательная накопленная потеря), physics_residual (подписанная ML-поправка) |
+| Экспозиция | physics (неотрицательная накопленная потеря), physics_residual (знаковая ML-поправка) |
 | E02 из проверенной ветки | e02_mode, e02_water, e02_thermal, e02_terrain |
 | Ансамбли | mean_blend (фиксированная смесь), oof_stack (неотрицательные веса с суммой 1) |
 
@@ -94,6 +95,8 @@ python -m pipetwin.pipeline export --predictions artifacts/selected-official-pre
   в модели не включены. MAIN-1 с конфликтом даты ввода исключена из основной проверки роста.
 - Физическая модель — калиброванная модель экспозиции в годах с коэффициентами мм/год.
   Она не подменяет отсутствующую химию формулами CO₂-коррозии.
+  Между ВТД её скорость калибруется только на ячейках с измеренной прошлой толщиной.
+  Номинальный запасной уровень на других ячейках не считается измеренной исходной стенкой.
 - E02-температура по концам трубы с исключением <=0.001 °C — явный сценарий заглушек.
   Направление потока не угадывается: в E02 используются модуль уклона и локальная впадина.
 

@@ -72,3 +72,15 @@ def test_convex_stack_and_constant_models():
     np.testing.assert_allclose(weights, fit_stack_weights(matrix[::-1], y[::-1]), atol=1e-6)
     with pytest.raises(ValueError, match="10 held-out"):
         fit_stack_weights(matrix[:3], y[:3])
+
+
+def test_unknown_old_thickness_cannot_calibrate_physical_growth():
+    known = pd.DataFrame({"anchor_mm": [8.0] * 20, "anchor_observed": [1] * 20,
+                          "horizon_years": [2.0] * 20, "active_years_observed": [1.0] * 20,
+                          "water_exposure_years": [0.3] * 20, "lowpoint_depth_m": [0.0] * 20})
+    unknown = known.assign(anchor_observed=0)
+    first = make_model("physics", "between").fit(known, np.full(20, 7.0))
+    second = make_model("physics", "between").fit(pd.concat([known, unknown]), np.r_[np.full(20, 7.0), np.full(20, 1.0)])
+    np.testing.assert_allclose(first.predict(known), second.predict(known))
+    with pytest.raises(ValueError, match="observed anchors"):
+        make_model("physics", "between").fit(unknown, np.full(20, 1.0))

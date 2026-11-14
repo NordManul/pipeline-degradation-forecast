@@ -5,6 +5,7 @@ import pytest
 from pipetwin import experiments, pipeline
 from pipetwin.uncertainty import calibrate_interval, interval_metrics, predict_interval
 from pipetwin.validation import blocked_folds
+from pipetwin.diagnostics import prediction_diagnostics
 
 
 def test_nested_stack_calibration_excludes_outer_validation_and_buffer(monkeypatch):
@@ -76,3 +77,14 @@ def test_json_has_null_for_undefined_metrics(tmp_path):
     path = tmp_path / "metrics.json"
     pipeline.write_json(path, {"r": np.nan, "weights": np.array([0.25, 0.75])})
     assert json.loads(path.read_text()) == {"r": None, "weights": [0.25, 0.75]}
+
+
+def test_saturation_diagnostic_exposes_unbounded_extrapolation():
+    class ExtrapolatingModel:
+        def predict(self, frame):
+            return np.array([50.0, 60.0])
+    frame = pd.DataFrame({"nominal_mm": [6, 6]})
+    diagnostics = prediction_diagnostics({"linear": ExtrapolatingModel()}, frame, "cold").iloc[0]
+    assert diagnostics.fraction_above_nominal == 1
+    assert diagnostics.constant_after_bounds
+    assert diagnostics.raw_max_mm == 60

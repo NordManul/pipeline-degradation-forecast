@@ -34,11 +34,20 @@ class ExposureModel:
     def fit(self, frame, y):
         design = self.design(frame)
         loss = initial_level(frame, self.scenario) - np.asarray(y)
+        if self.scenario == "between":
+            # Nominal fallback is not a measured old thickness and cannot
+            # calibrate physical growth over the between-inspection interval.
+            eligible = frame.anchor_observed.eq(1).to_numpy()
+            if not eligible.any():
+                raise ValueError("No observed anchors for physical growth calibration")
+            design, loss = design[eligible], loss[eligible]
         self.scale_ = np.maximum(np.sqrt(np.mean(design ** 2, axis=0)), 1e-9)
         standardized = design / self.scale_
         augmented = np.vstack([standardized, np.sqrt(self.regularization) * np.eye(design.shape[1])])
         response = np.concatenate([loss, np.zeros(design.shape[1])])
         self.coefficients_, _ = nnls(augmented, response)
+        self.rates_mm_per_year_ = self.coefficients_ / self.scale_
+        self.calibration_rows_ = len(loss)
         return self
 
     def predict(self, frame):
