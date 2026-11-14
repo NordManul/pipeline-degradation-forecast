@@ -34,9 +34,9 @@ def make_estimator(kind, seed):
 
 
 class TabularModel:
-    def __init__(self, scenario, kind, seed=42):
+    def __init__(self, scenario, kind, seed=42, columns=None):
         self.scenario, self.kind = scenario, kind
-        self.columns = feature_columns(scenario)
+        self.columns = feature_columns(scenario) if columns is None else columns
         self.estimator = make_estimator(kind, seed)
 
     def fit(self, frame, y):

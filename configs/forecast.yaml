@@ -24,7 +24,7 @@ section_offsets_m:
 folds: 4
 spatial_buffer_m: 100.0
 history_radius_m: 50.0
-models: [persistence, smooth_persistence, global_rate, local_rate, ridge, ridge_direct, huber, gam, random_forest, catboost, physics, physics_residual]
+models: [persistence, smooth_persistence, global_rate, local_rate, ridge, ridge_direct, huber, gam, random_forest, catboost, physics, physics_residual, e02_mode, e02_water, e02_thermal, e02_terrain]
 ensemble_candidates: [persistence, ridge, catboost, physics]
 # Assessment is exploratory on reported labels and local simple-section bins.
 # These are historical dates, not unconfirmed official scoring targets.

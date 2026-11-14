@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 
+from .physical_features import mode_features
+
 
 STATIC_FEATURES = [
     "nominal_mm", "diameter_mm", "age_years", "horizon_years", "position_fraction",
@@ -36,7 +38,8 @@ def _profile_features(frame, profile, radius_m):
     z_left, z_right = np.interp(left, x, z), np.interp(right, x, z)
     span = right - left
     slope = np.divide(z_right - z_left, span, out=np.full(len(frame), np.nan), where=span > 0)
-    lowpoint = np.maximum(0, (z_left + z_right) / 2 - altitude)
+    # A basin is below BOTH sides; a one-sided monotone slope is not a basin.
+    lowpoint = np.maximum(0, np.minimum(z_left, z_right) - altitude)
     return np.column_stack([altitude - np.median(z), slope, lowpoint]), np.isfinite(altitude).astype(int)
 
 
@@ -104,6 +107,14 @@ def build_snapshot(sources, grid, targets, spec, config):
         regime = sources.regime.loc[sources.regime.id.eq(section_id)]
         for key, value in _regime_features(regime, start, end).items():
             frame[key] = value
+        e02 = mode_features(regime.assign(calc_date=regime.date), pd.Series([section_id]), start, end).iloc[0]
+        for key, value in e02.items():
+            if key != "id":
+                frame["e02_" + key] = value
+        frame["e02_terrain_abs_slope"] = frame["slope_50m"].abs()
+        frame["e02_terrain_basin_depth_m"] = frame["lowpoint_depth_m"]
+        frame["e02_terrain_water_basin_m"] = frame["e02_water_fill_mean"] * frame["lowpoint_depth_m"]
+        frame["e02_terrain_slow_water_basin_m"] = frame["e02_thermal_water_slow_flow_mean"] * frame["lowpoint_depth_m"]
         frame["anchor_date"] = anchor
         frame["anchor_mm"] = frame["nominal_mm"]
         frame["anchor_nominal_mm"] = frame["nominal_mm"]
