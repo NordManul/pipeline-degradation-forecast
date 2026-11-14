@@ -35,6 +35,9 @@ from .uncertainty import calibrate_interval, interval_metrics, predict_interval
 from .validation import blocked_folds, regression_metrics
 
 
+THREE_WAY_WEIGHTS = {"baseline": .5, "level_profile": .3, "pooled_matched": .2}
+
+
 def score(frame, predictions):
     """Spearman and Pearson on the same observed cells; center by section/date."""
     mask = frame.observed.to_numpy()
@@ -97,6 +100,7 @@ def warm_fold(train, query, pool, columns, buffer_m, fallback):
     outputs["yetirank"] = warm_bounds(query, ranker.predict(query), fallback)
     outputs.update(pool.predict(query))
     outputs["blend_75ml_25pool"] = .75 * outputs["baseline"] + .25 * outputs["pooled_matched"]
+    outputs["blend_three"] = sum(outputs[name] * weight for name, weight in THREE_WAY_WEIGHTS.items())
     return outputs, ranker.calibration_rows_
 
 
@@ -291,6 +295,7 @@ def main():
         configs = ["contracts/cases.yaml", "contracts/validation.yaml", "contracts/case1/same-day-peers.yaml",
                    "contracts/case2/retrospective.yaml", "configs/matching.yaml", package["config"]["contract"]]
         write_json(staged / "provenance.json", {"seed": SEED, "zone_length_m": ZONE_LENGTH_M, "pseudo_cells": PRIOR_CELLS,
+                   "case1_three_way_weights": THREE_WAY_WEIGHTS,
                    "case2_ridge_alpha": CORRECTION_ALPHA, "case2_log_multiplier_limit": LOG_FACTOR_LIMIT,
                    "case2_loss_ratio_floor_mm": RATIO_FLOOR_MM,
                    "source_manifest": manifest, "prepared_sha256": sha256(args.prepared.read_bytes()).hexdigest(),
