@@ -221,6 +221,11 @@ def main(argv=None):
     transfer.add_argument("--contracts-dir", default="contracts")
     transfer.add_argument("--config", default="configs/forecast.yaml")
     transfer.add_argument("--output", required=True)
+    peers = sub.add_parser("case1-peers", help="Compare experimental same-day peer labels for case 1")
+    peers.add_argument("--prepared", required=True, help="Case 1 prepared.joblib from prepare-cases")
+    peers.add_argument("--data-dir", default="data/raw")
+    peers.add_argument("--contracts-dir", default="contracts")
+    peers.add_argument("--output", required=True)
     benchmark = sub.add_parser("benchmark", help="Run all historical comparisons and charts")
     benchmark.add_argument("--config", default="configs/forecast.yaml")
     benchmark.add_argument("--output", required=True)
@@ -247,6 +252,9 @@ def main(argv=None):
         elif args.command == "case2-transfer":
             from .case2_transfer import run
             run(args.data_dir, args.output, args.contracts_dir, args.config)
+        elif args.command == "case1-peers":
+            from .case1_peers import run
+            run(args.prepared, args.output, args.data_dir, args.contracts_dir)
         elif args.command == "benchmark":
             metrics, selection = run_benchmark(args.config, args.output)
             print(metrics.to_string(index=False))

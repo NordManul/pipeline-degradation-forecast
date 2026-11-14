@@ -173,10 +173,13 @@ def _profile(raw, passport, audit):
     return _deduplicate("profile", frame, ["id", "distance_m"], audit).reset_index(drop=True)
 
 
-def _inspection(raw, passport, cutoff, contract, audit):
+def _inspection(raw, passport, cutoff, contract, audit, *, campaign=None):
     frame = _dated("inspection", _indexed(raw), "date", cutoff, audit)
     frame = _ids("inspection", frame, "id", audit, set(passport.id))
     frame["date"] = frame.event_at.dt.normalize()
+    if campaign is not None:
+        frame = audit.exclude("inspection", frame, frame.date.ne(campaign), "Q_CAMPAIGN", "date",
+                              "outside_allowed_peer_campaign", "exclude_temporally")
     commissioned = frame.id.map(passport.set_index("id").commission_date)
     frame = audit.exclude("inspection", frame, frame.date.lt(commissioned), "Q_EPOCH", "date", "inspection_before_resolved_commission")
     dates = frame.date.dt.strftime("%Y-%m-%d")
@@ -280,6 +283,20 @@ def clean_sources(raw, case_id, contract, target_contract, manifest=None):
 def clean_case2_donors(raw, contract, target_contract, pool_cutoff, manifest=None):
     """Separate retrospective pool. Remove the complete target main before cleaning dated inputs."""
     return _clean_as_of(raw, "case2", contract, target_contract, pd.Timestamp(pool_cutoff), manifest, donors_only=True)
+
+
+def clean_case1_peer_inspections(raw_inspection, strict, peer_ids, target_contract, freeze):
+    """Read the eligible peer inspection only, leaving the strict feature sources intact."""
+    case = strict.contract["cases"]["case1"]
+    passport = strict.sources.passport
+    peers = passport.loc[passport.id.isin(peer_ids)]
+    if (strict.case_id != "case1" or set(peers.id) != set(peer_ids) or peers.empty
+            or peers.id.eq(case["id"]).any() or not peers.main_id.eq(case["main_id"]).all()
+            or not strict.cutoff < freeze):
+        raise ValueError("Peer labels require explicit non-target sections of the same main and a later dataset freeze")
+    audit = Audit("case1_peers", strict.sources.manifest)
+    inspection = _inspection(raw_inspection, peers, freeze, target_contract, audit, campaign=strict.cutoff)
+    return inspection, audit.table()
 
 
 def _clean_as_of(raw, case_id, contract, target_contract, cutoff, manifest, *, donors_only=False):
