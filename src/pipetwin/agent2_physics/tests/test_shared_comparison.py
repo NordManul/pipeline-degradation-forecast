@@ -24,6 +24,13 @@ def test_saved_shared_outputs_may_reorder_but_not_remove_keys(shared_table):
     verify_shared_predictions(package, table.assign(fold_id=-1).drop(columns=["observed", "y_mm"]), forecast=True)
 
 
+def test_csv_date_resolution_does_not_change_the_reference_keys(shared_table):
+    package, table = shared_table
+    package["train_frame"]["target_date"] = package["train_frame"].target_date.astype("datetime64[s]")
+    table["target_date"] = table.target_date.astype(str)
+    verify_shared_predictions(package, table)
+
+
 @pytest.mark.parametrize("change", ["mask", "fold", "key", "id", "date", "missing", "duplicate", "nonfinite"])
 def test_inconsistent_saved_outputs_are_rejected(shared_table, change):
     package, table = shared_table

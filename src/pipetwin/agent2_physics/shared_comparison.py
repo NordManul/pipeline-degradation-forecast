@@ -62,7 +62,11 @@ def verify_shared_predictions(package, table, *, forecast=False):
         for column in ["id", "case_id", "segment_id"]:
             if not group[column].astype(str).equals(reference[column].astype(str)):
                 raise ValueError(f"Saved predictions changed {column}")
-        if not pd.to_datetime(group.target_date).equals(pd.to_datetime(reference.target_date)):
+        # CSV parsing may change datetime64[s] to datetime64[ns] without changing
+        # a single timestamp. Compare values at a common resolution.
+        saved_dates = pd.to_datetime(group.target_date).to_numpy(dtype="datetime64[ns]")
+        expected_dates = pd.to_datetime(reference.target_date).to_numpy(dtype="datetime64[ns]")
+        if not np.array_equal(saved_dates, expected_dates):
             raise ValueError("Saved predictions changed target dates")
         if not np.array_equal(group.fold_id.to_numpy(), assignments.to_numpy()):
             raise ValueError("Saved predictions changed the shared fold assignment")
