@@ -1,0 +1,66 @@
+contract_version: "1.0.0"
+implementation_owner: primary_agent
+global_rules:
+  official_case_training_labels: available_at_strictly_before_case_cutoff
+  official_case_all_source_rows: available_at_and_event_time_strictly_before_case_cutoff
+  historical_sample_features: before_that_sample_target_or_explicit_earlier_as_of
+  historical_sample_anchor: strictly_before_sample_target
+  future_and_same_day_labels_from_other_ids: forbidden
+  complete_pipeline_fitted_inside_fold: true
+  learned_steps: [imputation, scaling, outlier_thresholds, feature_selection, calibration, ensemble_weights, early_stopping]
+  target_ili_geometry_counts_or_coverage_as_features: forbidden
+  clean_raw_data_before_case_cutoff: never_learn_rules_from_future_rows
+  mask_for_all_candidates: same_observed_valid_labels
+  drop_rows_without_past_ili_for_scoring: forbidden
+  separate_case_models_preprocessors_and_calibrators: true
+
+validation_modes:
+  temporal:
+    condition: all_training_label_available_at_strictly_before_validation_as_of
+    evaluate_only_if_eligible_training_data_exist: true
+    missing_eligible_training_data: report_not_estimable_do_not_train_on_later_campaign
+  spatial_auxiliary:
+    purpose: compare_candidates_within_known_past_campaign_not_measure_forward_time_generalization
+    coordinate: continuous_main_chain
+    folds: 4
+    buffer_m: 100.0
+    crossing_simple_section_boundaries: respected
+    max_feature_or_label_support_radius_m: must_not_exceed_buffer_or_buffer_must_increase
+    fold_assignments_and_keys: saved_once_by_primary_agent
+    labels_from_same_campaign: permitted_only_for_this_explicit_auxiliary_diagnostic
+    entire_data_universe: still_strictly_before_official_case_cutoff
+
+case1:
+  between_fit_transition: {anchor_date: "2018-09-23", label_date: "2022-07-06", main_id: MAIN-2}
+  eligible_other_labels: ["2018-09-23", "2023-08-12"]
+  other_labels_use: cold_or_pooled_models_with_compatible_features_not_fabricated_matched_transitions
+  temporal_between_backtest_with_earlier_valid_transition: not_available_in_current_data
+  spatial_between_diagnostic: MAIN_2_2022_common_four_folds
+  same_day_December_2023_other_sections: excluded_from_fit_selection_and_calibration
+
+case2:
+  cold_fit_label_date: "2018-09-23"
+  cold_fit_main: MAIN-2
+  observed_valid_segment_labels_before_further_channel_cleaning: 372
+  labels_2022_07_06: forbidden_five_days_after_target
+  labels_2023: forbidden
+  independent_temporal_or_other_main_backtest: not_available_with_resolved_current_epochs
+  auxiliary_diagnostic: spatial_blocks_of_2018_only_explicitly_not_independent_pipeline_transfer
+  inputs: cold_allowlist_no_anchor_measurement_or_anchor_coverage_features
+
+metrics:
+  per_case: [pearson_r, pearson_squared, mae_mm, rmse_mm, bias_mm, recall_thin_10pct]
+  aggregation_of_cases: unconfirmed_do_not_publish_a_fabricated_contest_total
+  constant_series_correlation: null_with_reason
+  official_scorer: not_provided
+  selection: predeclared_common_validation_signed_positive_r_then_pearson_squared_with_mae_tiebreak
+  ensembles_for_two_day_scope: fixed_predeclared_weights
+  prior_benchmarks: historical_exploration_not_official_case2_selection_evidence
+
+required_leakage_checks:
+  - adding_or_changing_rows_on_or_after_case_cutoff_does_not_change_training_features_or_predictions
+  - changing_held_labels_does_not_change_training_preprocessing_or_fitted_model
+  - changing_case1_bundle_does_not_change_case2_bundle
+  - adding_target_ili_geometry_never_changes_predict_inputs
+  - models_return_all_requested_keys_and_do_not_choose_their_own_score_mask
+  - matching_and_target_derived_spatial_rates_purge_both_sides_of_validation_pairs

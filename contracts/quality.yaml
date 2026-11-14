@@ -1,0 +1,87 @@
+contract_version: "1.0.0"
+implementation_owner: primary_agent
+status: specification_for_shared_cleaner_not_a_claim_that_all_rules_are_implemented
+raw_files: immutable
+processing_order:
+  - assign_stable_source_row_identifiers
+  - parse_keys_and_event_and_availability_dates
+  - apply_case_wide_temporal_eligibility_before_statistics
+  - apply_confirmed_unit_conversions
+  - validate_structure_ranges_and_cross_field_identities
+  - quarantine_invalid_rows_or_mask_invalid_channels
+  - build_geometry_targets_and_features
+  - fit_learned_imputation_scaling_and_outlier_rules_inside_training_fold
+
+actions:
+  invalid_key_or_date_or_unresolvable_geometry: quarantine_row
+  future_or_same_day_record: exclude_temporally_not_label_as_data_error
+  invalid_target_measurement: exclude_label_keep_audit
+  invalid_optional_channel: set_missing_and_keep_other_valid_channels
+  missing_observation: retain_unknown_status
+  statistically_unusual_but_physically_possible: flag_do_not_delete_automatically
+  inconsistent_metal_epoch: exclude_affected_epoch_from_training_until_resolved
+  exact_duplicate_record: deduplicate_log_count
+  conflicting_duplicate_record: quarantine_or_explicit_source_priority_never_silent_average
+
+rules:
+  - id: Q_KEY
+    requirement: source_id_resolves_to_passport_and_required_dates_parse
+  - id: Q_GEOMETRY
+    requirement: finite_positive_length_diameter_nominal_and_local_distance_in_declared_interval
+    do_not_clamp_outside_points_into_edge_cells: true
+  - id: Q_EPOCH
+    requirement: label_and_anchor_dates_not_before_resolved_commission_date
+    unresolved_group: MAIN-1_2014_with_2016_commission_and_4_5_vs_8_mm_nominal
+  - id: Q_THICKNESS
+    requirement: finite_positive_residual_not_above_observed_local_nominal_plus_0_05_mm
+    nominal_for_label_check: nominal_from_same_inspection_record
+    zero_residual: quarantine_as_unresolved_perforation_or_sentinel_not_automatically_healthy
+    signed_change_between_campaigns: preserve
+    compare_to_current_passport_before_resolving_epoch: forbidden
+  - id: Q_DEPTH
+    requirement: normalized_depth_fraction_in_0_to_1_and_consistent_reconstruction
+  - id: Q_FRACTION
+    columns: [water_fraction, fill_coefficient, gas_content_rate]
+    allowed_range: [0.0, 1.0]
+    action: mask_invalid_channel
+  - id: Q_FLOW
+    columns: [q, q_oil, q_gas]
+    working_representation: nonnegative_unsigned_flow_magnitudes
+    action_for_negative_or_infinite: mask_channel_and_log_reason
+    zero_means_zero_flow_not_a_missing_day: true
+  - id: Q_DENSITY_VISCOSITY
+    requirement: positive_finite_value_before_use_in_physical_division
+    zero_at_zero_flow: unavailable_channel_at_idle_not_infinite_flow_or_density
+  - id: Q_TEMPERATURE
+    known_placeholder: t_mix_zero_and_both_endpoint_temperatures_missing
+    known_placeholder_action: mask_channel
+    endpoint_values_le_0_001: explicit_legacy_sensitivity_scenario_not_universal_physical_rule
+    negative_Celsius_automatically_invalid: false
+  - id: Q_PRESSURE
+    unit: atm
+    absent_or_zero_fact_channel: unavailable_until_zero_semantics_confirmed
+    arbitrary_automatic_pressure_cap: forbidden
+    unresolved_pressure_and_corrosion_proxy: excluded_from_default_physical_formula
+  - id: Q_KNOWN_EVENT
+    source: TECH
+    section_id: "1250009583"
+    day: "2018-10-07"
+    reason: unresolved_joint_pressure_and_flow_anomaly_documented_U09
+    examples: {p_start_atm: 4946.806, p_end_atm: 4442.228, q_m3_day: 25732, q_oil_tonne_day: 21419.748}
+    action: quarantine_regime_day_pending_validation_preserve_unknown_day_in_calendar
+  - id: Q_POT_SNAPSHOT
+    default_static_allowlist: [id, main_id, direction_id, length_m, diameter_mm, nominal_mm, commission_date]
+    dynamic_pressure_flow_failure_repair_diagnostics: require_historical_availability_otherwise_exclude
+  - id: Q_ULTRASOUND
+    absolute_thickness: excluded_until_object_nominal_units_and_epoch_resolved
+  - id: Q_COUPONS
+    requirement: mapped_id_valid_nonreversed_interval_consistent_exposure_units_and_available_result_before_cutoff
+    missing_lab_release_date: exclude_from_baseline_pending_availability_confirmation
+    reverse_interval_absolute_value_fix: forbidden
+
+audit_output:
+  required_fields: [case_id, source_file, source_row_id, source_sha256, rule_id, field, raw_value, action, reason]
+  summaries_by: [case_id, source_file, rule_id, action]
+  raw_preserved: true
+  cleaned_data_does_not_overwrite_raw: true
+  invalid_optional_channel_does_not_delete_all_other_valid_data: true

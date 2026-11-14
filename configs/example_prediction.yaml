@@ -1,4 +1,4 @@
-# Historical replay example. Replace only after official scoring IDs/dates are known.
+# Historical replay example. Official requests are specified in contracts/cases.yaml.
 ids: ["1250009490", "1250011604"]
 anchor_date: "2022-07-06"
 target_date: "2023-12-01"

@@ -1,0 +1,93 @@
+contract_version: "1.0.0"
+updated_at: "2026-11-14"
+authority:
+  source: user_report_after_mentor_meeting
+  confirmed: [case_ids, target_dates, training_uses_all_other_valid_data, no_future_leakage]
+  date_format_in_original_reply: DD.MM.YY
+  statement_summary: >-
+    Кейс 1: 1250022871, ВТД на 01.12.23. Кейс 2: 1250009583,
+    ВТД на 01.07.22. Для обучения можно использовать все остальные данные;
+    ошибочные и логически недопустимые значения исключить. Обучение и
+    валидация должны учитывать отсутствие утечки из будущего.
+
+time_policy:
+  timezone: Europe/Moscow
+  cutoff_operator: strictly_before
+  apply_cutoff_to_all_sections: true
+  labels_available_at: inspection_date_provisional_unless_later_release_known
+  inference_as_of: target_day_start
+  inference_as_of_status: engineering_assumption_no_earlier_origin_supplied
+  same_day_records: excluded
+  dated_sources: [inspection, regime, ultrasound, coupons, repairs, passport_versions]
+  unknown_availability: exclude_unverified_derived_or_dynamic_fields
+  future_labels_allowed_for_fit_or_selection: false
+  case_bundles_are_separate: true
+
+geometry:
+  scope: simple_section
+  segment_length_m: 10.0
+  segment_id_start: 0
+  interval: left_closed_right_open
+  final_segment: shortened
+  point_at_section_end: excluded
+  defect_assignment: distance_point
+  status: engineering_convention_pending_official_template
+  export_requires_exact_template_keys: true
+
+target:
+  value: min_reported_valid_residual_wall_thickness_mm
+  types: all_valid_reported_residuals
+  types_status: engineering_default_not_new_mentor_confirmation
+  missing_record: unknown
+  infer_nominal_target_from_missing_record: false
+  censoring_without_known_coverage_and_detection_rule: forbidden
+  alternative_internal_corrosion: diagnostic_only_same_mask_comparison_required
+
+cases:
+  case1:
+    id: "1250022871"
+    id_level: simple_section
+    main_id: MAIN-2
+    scenario: between
+    target_date: "2023-12-01"
+    cutoff_exclusive: "2023-12-01T00:00:00"
+    anchor_date: "2022-07-06"
+    anchor_status: latest_available_prior_inspection_verified_in_data
+    length_m: 5248.4
+    nominal_mm: 8.0
+    commission_date: "2000-04-22"
+    expected_provisional_segments: 525
+    final_segment_length_m: 8.4
+    eligible_known_label_dates: ["2018-09-23", "2022-07-06", "2023-08-12"]
+    excluded_by_time_label_dates: ["2023-12-01"]
+    excluded_unresolved_epoch_label_dates: ["2014-12-28"]
+    official_target_labels_present_in_current_csv: false
+  case2:
+    id: "1250009583"
+    id_level: simple_section
+    main_id: MAIN-4
+    scenario: cold
+    target_date: "2022-07-01"
+    cutoff_exclusive: "2022-07-01T00:00:00"
+    anchor_date: null
+    anchor_status: no_inspection_for_this_id_in_current_csv
+    length_m: 14745.1
+    nominal_mm: 4.5
+    commission_date: "1993-06-20"
+    expected_provisional_segments: 1475
+    final_segment_length_m: 5.1
+    eligible_known_label_dates: ["2018-09-23"]
+    excluded_by_time_label_dates: ["2022-07-06", "2023-08-12", "2023-12-01"]
+    excluded_unresolved_epoch_label_dates: ["2014-12-28"]
+    official_target_labels_present_in_current_csv: false
+
+unresolved:
+  - official_template_and_segment_numbering
+  - exact_target_type_filter_and_long_defect_assignment
+  - inspection_coverage_detection_rules_and_official_score_mask
+  - exact_scoring_aggregation_and_constant_series_handling
+  - pressure_absolute_or_gauge_and_atmosphere_convention
+  - gas_reference_temperature_pressure_and_compressibility
+  - metal_epoch_for_MAIN_1_and_absolute_ultrasound_thickness
+  - meaning_and_validity_period_of_daily_regime_snapshots
+  - whether_an_earlier_forecast_origin_is_required

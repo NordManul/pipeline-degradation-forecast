@@ -1,0 +1,70 @@
+contract_version: "1.0.0"
+updated_at: "2026-11-14"
+confirmed_by_user_after_mentor:
+  p:
+    source_columns: [p_start, p_end, p_start_fact, p_end_fact]
+    source_unit: atm
+    canonical_unit: atm
+    scale: 1.0
+    absolute_or_gauge: unknown
+    physical_or_technical_atmosphere: not_explicitly_confirmed
+    conversion_to_absolute_pressure_or_pCO2: disabled_until_resolved
+  q:
+    source_unit: m3/day
+    canonical_column: liquid_flow_m3_day
+    scale: 1.0
+  q_oil:
+    source_unit: tonne/day
+    canonical_column: oil_mass_tonne_day
+    scale: 1.0
+    oil_volume_formula: 1000 * q_oil / density_oil_kg_m3
+    oil_volume_requires: finite_positive_density_in_kg_m3
+  q_gas:
+    source_unit: thousand_m3/day
+    canonical_column: gas_flow_m3_day_source_conditions
+    canonical_unit: m3/day_at_source_reference_conditions
+    scale: 1000.0
+    reference_conditions: unknown
+    sum_with_liquid_flow_for_hydraulics: forbidden_until_reference_conditions_known
+
+audit_supported_rules:
+  watercut:
+    source_unit: percent
+    canonical_column: water_fraction
+    scale: 0.01
+    applies_also_to_values_below_one: true
+  d_mm:
+    actual_source_unit: m
+    canonical_column: diameter_outer_m
+    scale: 1.0
+    to_passport_mm_scale: 1000.0
+  passport_length_km:
+    canonical_unit: m
+    scale: 1000.0
+  vtd_depth:
+    fraction_dates: ["2018-09-23"]
+    percent_dates: ["2014-12-28", "2022-07-06", "2023-08-12", "2023-12-01"]
+    fraction_formula: raw_value
+    percent_formula: raw_value / 100
+    reconstruction: residual_mm = nominal_observed_mm * (1 - depth_fraction)
+    arithmetic_tolerance_mm: 0.05
+    tolerance_is_instrument_sigma: false
+  vtd_feature_length_width:
+    source_unit: mm
+    axial_length_to_m_scale: 0.001
+  vtd_angle:
+    source_unit: degree
+    normalization: modulo_360
+  rate:
+    canonical_unit: mm/year
+    days_per_year: 365.25
+    loss_formula: sum(rate_mm_year * dt_days / 365.25)
+
+unconfirmed_physical_channels:
+  temperature: Celsius_working_interpretation_placeholder_policy_is_separate
+  dynamic_viscosity: Pa_s_working_interpretation
+  liquid_density: kg_m3_working_interpretation
+  gas_content_rate: fraction_supported_by_numerical_identity
+  chemistry_and_coupon_rates: require_method_units_mapping_and_availability
+
+reference: docs/units-and-dimensions.md
