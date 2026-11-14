@@ -1,7 +1,4 @@
-"""Public factory reserved for the second agent; see contracts/model-api.md.
-
-This scaffold is intentionally unimplemented and is not registered as a model.
-"""
+"""Public model factory for the canonical contract 1.0.0 inputs."""
 
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, Protocol
@@ -36,9 +33,13 @@ def make_model(
     seed: int = 42,
     options: Mapping[str, Any] | None = None,
 ) -> ThicknessEstimator:
-    """Implement within this package; no raw I/O, target building or CV here.
+    """Create an isolated case/scenario model without raw I/O or target building.
 
     Fit preprocessing only on the training frame's exposure_id values.
     The caller supplies a separate factory/context for each official case.
     """
-    raise NotImplementedError("Agent 2 implementation pending; contract version 1.0.0")
+    from .models import PhysicsEstimator
+
+    return PhysicsEstimator(name, scenario=scenario, exposure=exposure,
+                            cutoff_exclusive=cutoff_exclusive,
+                            feature_columns=feature_columns, seed=seed, options=options)
