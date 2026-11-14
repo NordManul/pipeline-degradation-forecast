@@ -1,0 +1,328 @@
+{
+  "selected": "catboost_reference_rate",
+  "validation_leader": "catboost_reference_rate",
+  "positive_on_both_mains": true,
+  "train_labels": 1080,
+  "independent_donor_mains": [
+    "MAIN-2",
+    "MAIN-3"
+  ],
+  "query_segments": 1475,
+  "query_observed_days": 1413,
+  "query_coverage": 0.13326417051777797,
+  "policy": {
+    "protocol": "case2_retrospective_v1",
+    "authority": "user_confirmed_later_labels_on_other_pipelines_allowed",
+    "supersedes": "strict_case2_fit_policy_only_for_case2_transfer_command",
+    "case_id": "case2",
+    "target_main": "MAIN-4",
+    "inference_cutoff_exclusive": "2022-07-01T00:00:00",
+    "pool_cutoff_exclusive": "2025-01-01T00:00:00",
+    "target_main_labels": "excluded_at_all_dates",
+    "donor_feature_cutoff": "strictly_before_each_donor_inspection",
+    "query_feature_cutoff": "strictly_before_query_date",
+    "missing_vtd": "unknown",
+    "validation": "hold_out_entire_main_including_all_campaigns",
+    "validation_related_directions": "MAIN-3_and_MAIN-4_share_DIR-3",
+    "unresolved_metal_epochs": [
+      "MAIN-1"
+    ]
+  },
+  "manifest": {
+    "pot_south.csv": {
+      "sha256": "c613a97a4e3d8b33e3ef2357caa98dd5fd6dbedefc8f52c8fa28a80ea29bf9e8",
+      "rows": 16,
+      "columns": 286
+    },
+    "altitudes_south.csv": {
+      "sha256": "2b3f5d05d34fff4ff066e9c3da9d47ad5bed0323de08be94b4ab4c06f967947c",
+      "rows": 20218,
+      "columns": 5
+    },
+    "tech_mode_for_embedings_with_length_with_temperatures_ids16.csv": {
+      "sha256": "560ba4c56429ae07969385a161e9d1b9665399af728e6d29f66d6e26cb227134",
+      "rows": 39052,
+      "columns": 24
+    },
+    "vtd_south_train.csv": {
+      "sha256": "e4cae76524ea06e44bf5e315f99786f655cebc5fe8206871da4fb70ef8f687b2",
+      "rows": 48291,
+      "columns": 42
+    },
+    "uzt_south.csv": {
+      "sha256": "25187e44c134a2bbf157471e03f0c8d37178796d062af4e613dd6a0f4e9a42b9",
+      "rows": 67,
+      "columns": 10
+    },
+    "repcorr_south.csv": {
+      "sha256": "1c17535b437b0ea036330db1996d04f7e0a4792b555b249b02d57f4e593f2dbf",
+      "rows": 495,
+      "columns": 59
+    }
+  },
+  "seed": 42,
+  "tabular": {
+    "catboost_reference_rate": [
+      "catboost",
+      "rate",
+      [
+        "nominal_mm",
+        "diameter_mm",
+        "age_years",
+        "horizon_years",
+        "position_fraction",
+        "altitude_relative_m",
+        "slope_50m",
+        "lowpoint_depth_m",
+        "profile_available",
+        "regime_coverage",
+        "active_fraction",
+        "water_fraction_mean",
+        "water_fraction_std",
+        "flow_mean_m3_day",
+        "flow_p90_m3_day",
+        "liquid_velocity_mean",
+        "temperature_mean_c",
+        "temperature_coverage",
+        "active_years_observed",
+        "water_exposure_years"
+      ]
+    ],
+    "catboost_without_position": [
+      "catboost",
+      "rate",
+      [
+        "nominal_mm",
+        "diameter_mm",
+        "age_years",
+        "horizon_years",
+        "altitude_relative_m",
+        "slope_50m",
+        "lowpoint_depth_m",
+        "profile_available",
+        "regime_coverage",
+        "active_fraction",
+        "water_fraction_mean",
+        "water_fraction_std",
+        "flow_mean_m3_day",
+        "flow_p90_m3_day",
+        "liquid_velocity_mean",
+        "temperature_mean_c",
+        "temperature_coverage",
+        "active_years_observed",
+        "water_exposure_years"
+      ]
+    ],
+    "catboost_terrain_retention": [
+      "catboost",
+      "retention",
+      [
+        "lowpoint_depth_m",
+        "profile_available",
+        "relief_25m",
+        "depression_25m",
+        "slope_magnitude_25m",
+        "relief_100m",
+        "depression_100m",
+        "slope_magnitude_100m",
+        "relief_250m",
+        "depression_250m",
+        "slope_magnitude_250m"
+      ]
+    ],
+    "catboost_local_retention": [
+      "catboost",
+      "retention",
+      [
+        "nominal_mm",
+        "diameter_mm",
+        "age_years",
+        "lowpoint_depth_m",
+        "profile_available",
+        "relief_25m",
+        "depression_25m",
+        "slope_magnitude_25m",
+        "relief_100m",
+        "depression_100m",
+        "slope_magnitude_100m",
+        "relief_250m",
+        "depression_250m",
+        "slope_magnitude_250m",
+        "water_fraction_mean",
+        "liquid_velocity_mean",
+        "temperature_mean_c",
+        "regime_coverage",
+        "active_fraction",
+        "e02_water_fill_mean",
+        "e02_thermal_water_slow_flow_mean",
+        "wet_depression_100m",
+        "wet_depression_250m"
+      ]
+    ],
+    "catboost_local_rate": [
+      "catboost",
+      "rate",
+      [
+        "nominal_mm",
+        "diameter_mm",
+        "age_years",
+        "lowpoint_depth_m",
+        "profile_available",
+        "relief_25m",
+        "depression_25m",
+        "slope_magnitude_25m",
+        "relief_100m",
+        "depression_100m",
+        "slope_magnitude_100m",
+        "relief_250m",
+        "depression_250m",
+        "slope_magnitude_250m",
+        "water_fraction_mean",
+        "liquid_velocity_mean",
+        "temperature_mean_c",
+        "regime_coverage",
+        "active_fraction",
+        "e02_water_fill_mean",
+        "e02_thermal_water_slow_flow_mean",
+        "wet_depression_100m",
+        "wet_depression_250m"
+      ]
+    ],
+    "gam_local_retention": [
+      "gam",
+      "retention",
+      [
+        "nominal_mm",
+        "diameter_mm",
+        "age_years",
+        "lowpoint_depth_m",
+        "profile_available",
+        "relief_25m",
+        "depression_25m",
+        "slope_magnitude_25m",
+        "relief_100m",
+        "depression_100m",
+        "slope_magnitude_100m",
+        "relief_250m",
+        "depression_250m",
+        "slope_magnitude_250m",
+        "water_fraction_mean",
+        "liquid_velocity_mean",
+        "temperature_mean_c",
+        "regime_coverage",
+        "active_fraction",
+        "e02_water_fill_mean",
+        "e02_thermal_water_slow_flow_mean",
+        "wet_depression_100m",
+        "wet_depression_250m"
+      ]
+    ],
+    "ridge_local_retention": [
+      "bounded_ridge",
+      "retention",
+      [
+        "nominal_mm",
+        "diameter_mm",
+        "age_years",
+        "lowpoint_depth_m",
+        "profile_available",
+        "relief_25m",
+        "depression_25m",
+        "slope_magnitude_25m",
+        "relief_100m",
+        "depression_100m",
+        "slope_magnitude_100m",
+        "relief_250m",
+        "depression_250m",
+        "slope_magnitude_250m",
+        "water_fraction_mean",
+        "liquid_velocity_mean",
+        "temperature_mean_c",
+        "regime_coverage",
+        "active_fraction",
+        "e02_water_fill_mean",
+        "e02_thermal_water_slow_flow_mean",
+        "wet_depression_100m",
+        "wet_depression_250m"
+      ]
+    ],
+    "relative_terrain_ridge": [
+      "bounded_ridge",
+      "relative",
+      [
+        "lowpoint_depth_m",
+        "profile_available",
+        "relief_25m",
+        "depression_25m",
+        "slope_magnitude_25m",
+        "relief_100m",
+        "depression_100m",
+        "slope_magnitude_100m",
+        "relief_250m",
+        "depression_250m",
+        "slope_magnitude_250m"
+      ]
+    ],
+    "relative_terrain_catboost": [
+      "catboost",
+      "relative",
+      [
+        "lowpoint_depth_m",
+        "profile_available",
+        "relief_25m",
+        "depression_25m",
+        "slope_magnitude_25m",
+        "relief_100m",
+        "depression_100m",
+        "slope_magnitude_100m",
+        "relief_250m",
+        "depression_250m",
+        "slope_magnitude_250m"
+      ]
+    ]
+  },
+  "physics": {
+    "physics_observed": [
+      "positive_rate",
+      "observed-only"
+    ],
+    "physics_imputed": [
+      "positive_rate",
+      "train-median"
+    ],
+    "physics_scale_observed": [
+      "hybrid_scale",
+      "observed-only"
+    ],
+    "physics_scale_imputed": [
+      "hybrid_scale",
+      "train-median"
+    ]
+  },
+  "blends": {
+    "blend_local_retention": [
+      0.5,
+      "catboost_local_retention",
+      "gam_local_retention"
+    ],
+    "blend_terrain": [
+      0.5,
+      "relative_terrain_ridge",
+      "relative_terrain_catboost"
+    ],
+    "blend_local_physics": [
+      0.75,
+      "catboost_local_retention",
+      "physics_scale_imputed"
+    ]
+  },
+  "source_sha256": {
+    "case2_transfer.py": "dc2900006767ad96dc2802bcfd2dfd95d2e63a093832094c2f294215952de630",
+    "case2_data.py": "51783d94d128cee22a6214b6486c2714c65180750a869cf7b5e34bd44c6ed38d",
+    "cases.yaml": "ca357604f9fd01722ed7a86ba598b77c9f1dc62bc1d6b5cbc204bba4943cd1b6",
+    "retrospective.yaml": "b6314253cf8999af3d7d93253e93730f67a169bc242c972cc08d723d1cc3c268",
+    "forecast.yaml": "760a33511f95552bfca0eeff3a2928ffdc78d17062b443d7feb3b836795edcd1",
+    "data_contract.yaml": "92d8fe660d2382f55d1491ffa17c2fcda753c584795576b5b1c69572870b97f9"
+  },
+  "status": "provisional_hidden_target"
+}

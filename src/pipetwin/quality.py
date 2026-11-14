@@ -274,10 +274,23 @@ def clean_sources(raw, case_id, contract, target_contract, manifest=None):
     cutoff = pd.Timestamp(case["cutoff_exclusive"])
     if cutoff != pd.Timestamp(case["target_date"]) or contract["time_policy"]["cutoff_operator"] != "strictly_before":
         raise ValueError("Only the declared strict pre-target cutoff is implemented")
+    return _clean_as_of(raw, case_id, contract, target_contract, cutoff, manifest)
+
+
+def clean_case2_donors(raw, contract, target_contract, pool_cutoff, manifest=None):
+    """Separate retrospective pool. Remove the complete target main before cleaning dated inputs."""
+    return _clean_as_of(raw, "case2", contract, target_contract, pd.Timestamp(pool_cutoff), manifest, donors_only=True)
+
+
+def _clean_as_of(raw, case_id, contract, target_contract, cutoff, manifest, *, donors_only=False):
+    case = contract["cases"][case_id]
     audit = Audit(case_id, manifest or {})
     passport = _passport(raw["passport"], cutoff, audit)
-    if case["id"] not in set(passport.id):
+    target = passport.loc[passport.id.eq(case["id"])]
+    if len(target) != 1 or not target.main_id.eq(case["main_id"]).all():
         raise ValueError("Official target passport failed validation")
+    if donors_only:
+        passport = passport.loc[passport.main_id.ne(case["main_id"])].copy()
     profile = _profile(raw["profile"], passport, audit)
     inspection = _inspection(raw["inspection"], passport, cutoff, target_contract, audit)
     regime = _regime(raw["regime"], passport, cutoff, audit)

@@ -216,6 +216,11 @@ def main(argv=None):
     official.add_argument("--config", default="configs/case_benchmark.yaml")
     official.add_argument("--contracts-dir", default="contracts")
     official.add_argument("--data-dir", default="data/raw")
+    transfer = sub.add_parser("case2-transfer", help="Fit case 2 using other mains under the retrospective protocol")
+    transfer.add_argument("--data-dir", default="data/raw")
+    transfer.add_argument("--contracts-dir", default="contracts")
+    transfer.add_argument("--config", default="configs/forecast.yaml")
+    transfer.add_argument("--output", required=True)
     benchmark = sub.add_parser("benchmark", help="Run all historical comparisons and charts")
     benchmark.add_argument("--config", default="configs/forecast.yaml")
     benchmark.add_argument("--output", required=True)
@@ -239,6 +244,9 @@ def main(argv=None):
             metrics, selection = run_case_benchmark(args.prepared, args.output, args.config, args.contracts_dir, args.data_dir)
             print(metrics.loc[metrics.output.eq("bounded")].to_string(index=False))
             print(f"Report: {Path(args.output).resolve() / 'report.html'}")
+        elif args.command == "case2-transfer":
+            from .case2_transfer import run
+            run(args.data_dir, args.output, args.contracts_dir, args.config)
         elif args.command == "benchmark":
             metrics, selection = run_benchmark(args.config, args.output)
             print(metrics.to_string(index=False))
