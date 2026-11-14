@@ -210,6 +210,12 @@ def main(argv=None):
     preparation.add_argument("--contracts-dir", default="contracts")
     preparation.add_argument("--config", default="configs/forecast.yaml")
     preparation.add_argument("--output", required=True)
+    official = sub.add_parser("case-benchmark", help="Compare models on shared mentor-confirmed case inputs")
+    official.add_argument("--prepared", required=True)
+    official.add_argument("--output", required=True)
+    official.add_argument("--config", default="configs/case_benchmark.yaml")
+    official.add_argument("--contracts-dir", default="contracts")
+    official.add_argument("--data-dir", default="data/raw")
     benchmark = sub.add_parser("benchmark", help="Run all historical comparisons and charts")
     benchmark.add_argument("--config", default="configs/forecast.yaml")
     benchmark.add_argument("--output", required=True)
@@ -228,6 +234,11 @@ def main(argv=None):
             from .case_data import prepare_cases
             summaries = prepare_cases(args.data_dir, args.output, args.contracts_dir, args.config)
             print(pd.DataFrame(summaries).to_string(index=False))
+        elif args.command == "case-benchmark":
+            from .case_experiments import run_case_benchmark
+            metrics, selection = run_case_benchmark(args.prepared, args.output, args.config, args.contracts_dir, args.data_dir)
+            print(metrics.loc[metrics.output.eq("bounded")].to_string(index=False))
+            print(f"Report: {Path(args.output).resolve() / 'report.html'}")
         elif args.command == "benchmark":
             metrics, selection = run_benchmark(args.config, args.output)
             print(metrics.to_string(index=False))

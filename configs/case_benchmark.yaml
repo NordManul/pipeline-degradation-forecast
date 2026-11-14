@@ -1,0 +1,15 @@
+# Frozen candidates for the mentor-confirmed cases, using prepared common folds.
+seed: 42
+models: [persistence, smooth_persistence, global_rate, local_rate, ridge, ridge_direct, huber, gam, random_forest, catboost, e02_mode, e02_water, e02_thermal, e02_terrain, agent2_constant_rate, agent2_positive_rate, agent2_hybrid_residual, agent2_hybrid_scale]
+agent2_options:
+  missing_policy: observed-only
+fixed_blends:
+  blend_gam_catboost: {gam: 0.5, catboost: 0.5}
+  blend_gam_physics: {gam: 0.75, agent2_hybrid_scale: 0.25}
+matching_config: configs/matching.yaml
+include_matching: true
+# Warm rate calibration uses measured anchors only. ALL warm forecasts without
+# an anchor use the same train-median residual fraction of nominal thickness.
+between_missing_anchor_policy: shared_train_median_fraction
+selection: positive_r_then_pearson_squared_then_mae
+# Raw output diagnostics do not silently change this predeclared OOF selection.
