@@ -79,7 +79,8 @@ def prepare(raw, manifest):
     config = {**read_config("configs/forecast.yaml"), "temperature_policy": "observed_endpoints"}
     # This context's date is a LOADING bound, not the target state date. The
     # existing cleaner requires its cutoff/date to agree; its rules are reused.
-    contract["cases"][CONTEXT] = {"id": TARGET_ID, "target_date": str(TRAINING_CUTOFF.date()),
+    contract["cases"][CONTEXT] = {"id": TARGET_ID, "main_id": contract["cases"]["case2"]["main_id"],
+                                "target_date": str(TRAINING_CUTOFF.date()),
                                 "cutoff_exclusive": str(TRAINING_CUTOFF.date())}
     cleaned = clean_sources(raw, CONTEXT, contract, target_contract, manifest)
     target_main = cleaned.sources.passport.set_index("id").loc[TARGET_ID, "main_id"]

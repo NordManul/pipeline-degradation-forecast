@@ -41,7 +41,8 @@ def run(output, missing_policy="observed-only", physics_only=False):
     context = "diagnostic_cold_transfer"
     # The extra day loads the proxy's labels for SCORING. Training and every
     # feature window still end strictly before the proxy observation date.
-    contract["cases"][context] = {"id": "1250009583", "target_date": "2023-08-13",
+    contract["cases"][context] = {"id": "1250009583", "main_id": contract["cases"]["case2"]["main_id"],
+                                  "target_date": "2023-08-13",
                                   "cutoff_exclusive": "2023-08-13"}
     cleaned = clean_sources(raw, context, contract, target_contract, manifest)
     grid = build_grid(cleaned.sources.passport, target_contract["segment_length_m"])

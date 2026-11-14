@@ -29,7 +29,8 @@ def run(prepared, output):
     target_contract = read_config("configs/data_contract.yaml")
     config = {**read_config("configs/forecast.yaml"), "temperature_policy": "observed_endpoints"}
     context = "diagnostic_inventory"
-    contract["cases"][context] = {"id": "1250009583", "target_date": "2024-12-01",
+    contract["cases"][context] = {"id": "1250009583", "main_id": contract["cases"]["case2"]["main_id"],
+                                  "target_date": "2024-12-01",
                                   "cutoff_exclusive": "2024-12-01"}
     cleaned = clean_sources(raw, context, contract, target_contract, manifest)
     grid = build_grid(cleaned.sources.passport, target_contract["segment_length_m"])
