@@ -22,11 +22,13 @@ def build_targets(sources, grid, contract):
         raise ValueError(f"Unknown target policy: {policy}")
     if policy == "corrosion_only":
         rows.loc[~rows["is_corrosion"] & rows["exclusion_reason"].eq(""), "exclusion_reason"] = "other_feature_type"
-    valid = rows.loc[rows["exclusion_reason"].eq("")]
+    valid = rows.loc[rows["exclusion_reason"].eq("")].copy()
+    valid["label_available_at"] = valid["available_at"] if "available_at" in valid else valid["date"]
     measured = valid.groupby(["id", "date", "segment_id"], as_index=False).agg(
         thickness_mm=("thickness_mm", "min"),
         nominal_observed_mm=("nominal_observed_mm", "median"),
         recorded_features=("row_id", "size"),
+        label_available_at=("label_available_at", "max"),
     )
     campaigns = rows[["id", "date"]].drop_duplicates()
     targets = grid.merge(campaigns, on="id", validate="many_to_many").merge(

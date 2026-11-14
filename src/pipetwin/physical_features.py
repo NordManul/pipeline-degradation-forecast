@@ -28,34 +28,42 @@ def ablation_columns(name, scenario):
     return baseline + ["e02_" + column for block in order[:order.index(name) + 1] for column in blocks[block]]
 
 
-def daily_mode(tech: pd.DataFrame, start: str, end: str) -> pd.DataFrame:
+def daily_mode(tech: pd.DataFrame, start: str, end: str, *, temperature_policy="legacy_positive") -> pd.DataFrame:
     """Last snapshot per observed day in [start, end); no filling across gaps."""
     start, end = pd.Timestamp(start), pd.Timestamp(end)
     if start != start.normalize() or end != end.normalize() or start >= end:
         raise ValueError("Window boundaries must be increasing midnight timestamps")
     columns = ["id" if c == "simple_section_id" else c for c in TECH_COLUMNS]
-    rows = tech.loc[(tech.calc_date >= start) & (tech.calc_date < end), columns].copy()
+    eligible = (tech.calc_date >= start) & (tech.calc_date < end)
+    if "available_at" in tech:
+        eligible &= tech.available_at.lt(end)
+        columns += ["available_at"]
+    rows = tech.loc[eligible, columns].copy()
     rows = rows.drop_duplicates()
     if rows.duplicated(["id", "calc_date"]).any():
         raise ValueError("Conflicting TECH snapshots at the same timestamp")
     rows["day"] = rows.calc_date.dt.normalize()
     rows = rows.sort_values("calc_date").drop_duplicates(["id", "day"], keep="last")
-    for column in columns[2:]:
+    for column in TECH_COLUMNS[2:]:
         rows[column] = pd.to_numeric(rows[column], errors="coerce").replace([np.inf, -np.inf], np.nan)
     rows["q"] = rows.q.where(rows.q >= 0)
     rows["water_fraction"] = rows.watercut.where(rows.watercut.between(0, 100)) / 100
     rows["fill_coefficient"] = rows.fill_coefficient.where(rows.fill_coefficient.between(0, 1))
     rows["velocity_m_s"] = rows.v_liquid_true.where(rows.v_liquid_true >= 0)
     # A documented sensitivity scenario for tiny thermal-calculation placeholders.
-    temperatures = rows[["t_start", "t_end"]].where(rows[["t_start", "t_end"]] > 0.001)
+    temperatures = rows[["t_start", "t_end"]]
+    if temperature_policy == "legacy_positive":
+        temperatures = temperatures.where(temperatures > 0.001)
+    elif temperature_policy != "observed_endpoints":
+        raise ValueError("Unknown temperature interpretation")
     rows["temperature_c"] = temperatures.mean(axis=1, skipna=False)
     rows["water_volume_m3"] = rows.q * rows.water_fraction
     rows["water_fill"] = rows.water_fraction * rows.fill_coefficient
     rows["water_slow_flow"] = rows.water_fraction / (1 + rows.velocity_m_s / 1.0)
     return rows
 
-def mode_features(tech: pd.DataFrame, ids: pd.Series, start: str, end: str) -> pd.DataFrame:
-    daily = daily_mode(tech, start, end)
+def mode_features(tech: pd.DataFrame, ids: pd.Series, start: str, end: str, *, temperature_policy="legacy_positive") -> pd.DataFrame:
+    daily = daily_mode(tech, start, end, temperature_policy=temperature_policy)
     days = (pd.Timestamp(end) - pd.Timestamp(start)).days
     records = []
     for section_id in ids:

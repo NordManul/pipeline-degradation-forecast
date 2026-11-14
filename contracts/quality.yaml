@@ -1,6 +1,7 @@
 contract_version: "1.0.0"
 implementation_owner: primary_agent
-status: specification_for_shared_cleaner_not_a_claim_that_all_rules_are_implemented
+status: shared_source_cleaner_and_case_preparation_implemented
+implementation_entrypoint: pipetwin.quality.load_case_sources
 raw_files: immutable
 processing_order:
   - assign_stable_source_row_identifiers
