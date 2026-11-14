@@ -240,6 +240,7 @@ def main(argv=None):
     export.add_argument("--output", required=True)
     assemble = sub.add_parser("assemble-cases", help="Export the selected models for both cases")
     assemble.add_argument("--case1", required=True)
+    assemble.add_argument("--case1-column", choices=["combined_context", "direct_comparable"], default="combined_context")
     assemble.add_argument("--case2", required=True)
     assemble.add_argument("--data-dir", default="data/raw")
     assemble.add_argument("--template", help="Official template; otherwise check against the passport grid")
@@ -273,7 +274,7 @@ def main(argv=None):
             print(f"Wrote {len(result)} predictions to {Path(args.output).resolve()}")
         elif args.command == "assemble-cases":
             from .submission import assemble_cases
-            result = assemble_cases(args.case1, args.case2, args.data_dir, args.output, args.template)
+            result = assemble_cases(args.case1, args.case2, args.data_dir, args.output, args.template, args.case1_column)
             print(f"Exported {len(result)} rows ({'official template' if args.template else 'passport grid'})")
         elif args.command == "submission-checks":
             from .submission_checks import run

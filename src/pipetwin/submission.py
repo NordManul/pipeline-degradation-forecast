@@ -50,13 +50,13 @@ def export_submission(predictions, template, output):
     return result
 
 
-def assemble_cases(case1_path, case2_path, data_dir, output, template_path=None):
+def assemble_cases(case1_path, case2_path, data_dir, output, template_path=None, case1_column="combined_context"):
     """Combine the selected strict case 1 and retrospective case 2 forecasts."""
     from .geometry import build_grid
     from .quality import load_case_sources
 
     frames, grids = [], []
-    for name, path, column in [("case1", case1_path, "combined_context"), ("case2", case2_path, "thickness_pred")]:
+    for name, path, column in [("case1", case1_path, case1_column), ("case2", case2_path, "thickness_pred")]:
         cleaned = load_case_sources(data_dir, name)
         spec = cleaned.contract["cases"][name]
         grid = build_grid(cleaned.sources.passport, cleaned.contract["geometry"]["segment_length_m"])
