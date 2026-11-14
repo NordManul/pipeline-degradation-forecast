@@ -1,0 +1,61 @@
+{
+  "policy": {
+    "protocol": "case1_same_day_peers_exploratory_v1",
+    "competition_eligibility": "requires_confirmation_for_same_main_same_campaign",
+    "case_id": "case1",
+    "target_id": "1250022871",
+    "target_main": "MAIN-2",
+    "target_date": "2023-12-01",
+    "peer_ids": [
+      "1250009490",
+      "1250011604"
+    ],
+    "label_pool_cutoff_exclusive": "2025-01-01T00:00:00",
+    "allowed_peer_label_date": "2023-12-01",
+    "query_and_peer_features": "strictly_before_each_prediction_date",
+    "target_same_day_or_later_ili": "excluded",
+    "base_model": "combined_context",
+    "fixed_blend_new_model_weight": 0.5,
+    "residual_ridge_alpha": 40.0,
+    "residual_limit_mm": 0.5
+  },
+  "seed": 42,
+  "source_manifest": {
+    "pot_south.csv": {
+      "sha256": "c613a97a4e3d8b33e3ef2357caa98dd5fd6dbedefc8f52c8fa28a80ea29bf9e8",
+      "rows": 16,
+      "columns": 286
+    },
+    "altitudes_south.csv": {
+      "sha256": "2b3f5d05d34fff4ff066e9c3da9d47ad5bed0323de08be94b4ab4c06f967947c",
+      "rows": 20218,
+      "columns": 5
+    },
+    "tech_mode_for_embedings_with_length_with_temperatures_ids16.csv": {
+      "sha256": "560ba4c56429ae07969385a161e9d1b9665399af728e6d29f66d6e26cb227134",
+      "rows": 39052,
+      "columns": 24
+    },
+    "vtd_south_train.csv": {
+      "sha256": "e4cae76524ea06e44bf5e315f99786f655cebc5fe8206871da4fb70ef8f687b2",
+      "rows": 48291,
+      "columns": 42
+    },
+    "uzt_south.csv": {
+      "sha256": "25187e44c134a2bbf157471e03f0c8d37178796d062af4e613dd6a0f4e9a42b9",
+      "rows": 67,
+      "columns": 10
+    },
+    "repcorr_south.csv": {
+      "sha256": "1c17535b437b0ea036330db1996d04f7e0a4792b555b249b02d57f4e593f2dbf",
+      "rows": 495,
+      "columns": 59
+    }
+  },
+  "prepared_sha256": "39be24207bce07825d47ccad7b887c16344258b8bf0bec52d40f3556a029ac08",
+  "policy_sha256": "5062cc2884056e3ad017986c0c9f2a673e3bc8ad9758552e44af87880160130f",
+  "code_sha256": "f753de477e4ed04992ec8b2dbc79676cbb7276be81ed41071160f96744b6c7c1",
+  "observed_peer_labels": 53,
+  "observed_anchored_peer_labels": 52,
+  "forecast_cells": 525
+}

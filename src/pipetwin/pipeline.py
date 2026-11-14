@@ -216,6 +216,16 @@ def main(argv=None):
     official.add_argument("--config", default="configs/case_benchmark.yaml")
     official.add_argument("--contracts-dir", default="contracts")
     official.add_argument("--data-dir", default="data/raw")
+    transfer = sub.add_parser("case2-transfer", help="Fit case 2 using other mains under the retrospective protocol")
+    transfer.add_argument("--data-dir", default="data/raw")
+    transfer.add_argument("--contracts-dir", default="contracts")
+    transfer.add_argument("--config", default="configs/forecast.yaml")
+    transfer.add_argument("--output", required=True)
+    peers = sub.add_parser("case1-peers", help="Compare experimental same-day peer labels for case 1")
+    peers.add_argument("--prepared", required=True, help="Case 1 prepared.joblib from prepare-cases")
+    peers.add_argument("--data-dir", default="data/raw")
+    peers.add_argument("--contracts-dir", default="contracts")
+    peers.add_argument("--output", required=True)
     benchmark = sub.add_parser("benchmark", help="Run all historical comparisons and charts")
     benchmark.add_argument("--config", default="configs/forecast.yaml")
     benchmark.add_argument("--output", required=True)
@@ -228,6 +238,16 @@ def main(argv=None):
     export.add_argument("--predictions", required=True)
     export.add_argument("--template", required=True)
     export.add_argument("--output", required=True)
+    assemble = sub.add_parser("assemble-cases", help="Export the selected models for both cases")
+    assemble.add_argument("--case1", required=True)
+    assemble.add_argument("--case1-column", choices=["combined_context", "direct_comparable"], default="combined_context")
+    assemble.add_argument("--case2", required=True)
+    assemble.add_argument("--data-dir", default="data/raw")
+    assemble.add_argument("--template", help="Official template; otherwise check against the passport grid")
+    assemble.add_argument("--output", required=True)
+    checks = sub.add_parser("submission-checks", help="Evaluate submission-time ablations and interval calibration")
+    checks.add_argument("--prepared", required=True, help="Case 1 prepared.joblib")
+    checks.add_argument("--output", required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "prepare-cases":
@@ -239,6 +259,12 @@ def main(argv=None):
             metrics, selection = run_case_benchmark(args.prepared, args.output, args.config, args.contracts_dir, args.data_dir)
             print(metrics.loc[metrics.output.eq("bounded")].to_string(index=False))
             print(f"Report: {Path(args.output).resolve() / 'report.html'}")
+        elif args.command == "case2-transfer":
+            from .case2_transfer import run
+            run(args.data_dir, args.output, args.contracts_dir, args.config)
+        elif args.command == "case1-peers":
+            from .case1_peers import run
+            run(args.prepared, args.output, args.data_dir, args.contracts_dir)
         elif args.command == "benchmark":
             metrics, selection = run_benchmark(args.config, args.output)
             print(metrics.to_string(index=False))
@@ -246,6 +272,13 @@ def main(argv=None):
         elif args.command == "predict":
             result = run_prediction(args.bundle, args.spec, args.output, args.raw_dir)
             print(f"Wrote {len(result)} predictions to {Path(args.output).resolve()}")
+        elif args.command == "assemble-cases":
+            from .submission import assemble_cases
+            result = assemble_cases(args.case1, args.case2, args.data_dir, args.output, args.template, args.case1_column)
+            print(f"Exported {len(result)} rows ({'official template' if args.template else 'passport grid'})")
+        elif args.command == "submission-checks":
+            from .submission_checks import run
+            run(args.prepared, args.output)
         else:
             predictions = pd.read_csv(args.predictions, dtype={"id": str})
             template = pd.read_csv(args.template, dtype={"id": str})

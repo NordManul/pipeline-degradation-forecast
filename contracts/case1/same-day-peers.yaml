@@ -1,0 +1,15 @@
+protocol: case1_same_day_peers_exploratory_v1
+competition_eligibility: requires_confirmation_for_same_main_same_campaign
+case_id: case1
+target_id: '1250022871'
+target_main: MAIN-2
+target_date: '2023-12-01'
+peer_ids: ['1250009490', '1250011604']
+label_pool_cutoff_exclusive: '2025-01-01T00:00:00'
+allowed_peer_label_date: '2023-12-01'
+query_and_peer_features: strictly_before_each_prediction_date
+target_same_day_or_later_ili: excluded
+base_model: combined_context
+fixed_blend_new_model_weight: 0.5
+residual_ridge_alpha: 40.0
+residual_limit_mm: 0.5
