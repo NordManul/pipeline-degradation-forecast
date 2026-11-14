@@ -30,6 +30,8 @@ DEFAULT_OPTIONS = {
     "residual_guard": "none",
     "residual_z_limit": 3.0,
     "residual_min_relative_scale": 1e-6,
+    "cold_nominal_scaling": "none",
+    "residual_feature_map": "identity",
     "max_nfev": 2000,
 }
 
@@ -45,6 +47,10 @@ def parse_options(options):
         raise ValueError("missing_policy must be observed-only or train-median")
     if result["residual_guard"] not in {"none", "train-bounded"}:
         raise ValueError("residual_guard must be none or train-bounded")
+    if result["cold_nominal_scaling"] not in {"none", "train-relative"}:
+        raise ValueError("cold_nominal_scaling must be none or train-relative")
+    if result["residual_feature_map"] not in {"identity", "terrain-symmetric"}:
+        raise ValueError("residual_feature_map must be identity or terrain-symmetric")
     for key in ["rate_regularization", "robust_delta_mm", "residual_alpha", "scale_regularization",
                 "residual_z_limit", "residual_min_relative_scale"]:
         value = result[key]
@@ -92,6 +98,11 @@ class PhysicsEstimator:
         if name in {"hybrid_residual", "hybrid_scale"} and not self.feature_columns:
             raise ValueError(f"{name} requires explicit correction features")
         self.seed, self.options = int(seed), parse_options(options)
+        if scenario != "cold" and self.options["cold_nominal_scaling"] != "none":
+            raise ValueError("Nominal scaling is an experimental cold-only hypothesis")
+        if self.options["residual_feature_map"] == "terrain-symmetric":
+            if name != "hybrid_residual" or set(self.feature_columns) != {"slope_50m", "lowpoint_depth_m"}:
+                raise ValueError("terrain-symmetric requires hybrid_residual and exactly the two terrain features")
         # A caller's later edits cannot mutate the model's case context.
         self.exposure = exposure.copy(deep=True)
         self._fitted = False
@@ -110,7 +121,20 @@ class PhysicsEstimator:
     def _loss(self, frame, history):
         rates = np.exp(self.rate_parameters_[0] + self._rate_matrix(history) @ self.rate_parameters_[1:])
         losses = integrate_loss(history, rates, self.options["missing_policy"])
-        return frame.exposure_id.map(losses).to_numpy(dtype=float)
+        return frame.exposure_id.map(losses).to_numpy(dtype=float) * self._nominal_factor(frame)
+
+    def _nominal_factor(self, frame):
+        # Saved pre-search models have neither the option nor the reference.
+        if self.options.get("cold_nominal_scaling", "none") == "train-relative":
+            return frame.nominal_mm.to_numpy(dtype=float) / self.reference_nominal_mm_
+        return np.ones(len(frame))
+
+    def _correction_matrix(self, frame):
+        if self.options.get("residual_feature_map", "identity") == "terrain-symmetric":
+            values = feature_matrix(frame, ["slope_50m", "lowpoint_depth_m"]).copy()
+            values[:, 0] = np.abs(values[:, 0])
+            return values, ["abs_slope_50m", "lowpoint_depth_m"]
+        return feature_matrix(frame, self.feature_columns), list(self.feature_columns)
 
     def _scale_matrix(self, frame):
         matrix = self.scale_transformer_.transform(feature_matrix(frame, self.feature_columns))
@@ -124,6 +148,9 @@ class PhysicsEstimator:
         self.last_prediction_ = None
         data = validate_inputs(frame, self.exposure, self.scenario, self.cutoff, y=y_mm)
         train = data.frame.loc[data.eligible]
+        self.reference_nominal_mm_ = (float(train.nominal_mm.median())
+                                      if self.options["cold_nominal_scaling"] == "train-relative" else None)
+        nominal_factor = self._nominal_factor(train)
         history = data.exposure.loc[data.exposure.exposure_id.isin(train.exposure_id)].copy()
         observed = history.loc[history.observed]
         if self.name != "constant_rate":
@@ -145,12 +172,13 @@ class PhysicsEstimator:
         initial, y = data.initial[data.eligible], data.y[data.eligible]
         # Keep signed observed loss: increasing measured thickness is not zero loss.
         observed_loss = initial - y
-        start_rate = np.clip(np.median(observed_loss[total_years > 0] / total_years[total_years > 0]), 1e-4, 1)
+        effective_years = total_years * nominal_factor
+        start_rate = np.clip(np.median(observed_loss[effective_years > 0] / effective_years[effective_years > 0]), 1e-4, 1)
 
         def residual(parameters):
             rates = np.exp(parameters[0] + matrix @ parameters[1:])
             loss = np.bincount(day_group, weights=rates * durations, minlength=len(identifiers))[sample_group]
-            prediction = np.maximum(0, initial - loss)
+            prediction = np.maximum(0, initial - loss * nominal_factor)
             errors = robust_residual(prediction - y, self.options["robust_delta_mm"]) / np.sqrt(len(train))
             return np.r_[errors, np.sqrt(self.options["rate_regularization"]) * parameters[1:]]
 
@@ -164,24 +192,27 @@ class PhysicsEstimator:
         guard_diagnostics = None
         scale_diagnostics = None
         if self.name == "hybrid_residual":
+            correction_matrix, correction_columns = self._correction_matrix(train)
             if self.options["residual_guard"] == "train-bounded":
                 self.correction_ = make_pipeline(
-                    TrainBoundedFeatures(self.feature_columns, self.options["residual_z_limit"],
+                    TrainBoundedFeatures(correction_columns, self.options["residual_z_limit"],
                                          self.options["residual_min_relative_scale"]),
                     Ridge(alpha=self.options["residual_alpha"]))
             else:
                 self.correction_ = make_pipeline(
                     SimpleImputer(strategy="median", add_indicator=True, keep_empty_features=True),
                     StandardScaler(), Ridge(alpha=self.options["residual_alpha"]))
-            # Signed mm/year correction transfers explicitly across horizons.
-            response = (y - physics) / data.years[data.eligible]
-            self.correction_.fit(feature_matrix(train, self.feature_columns), response)
+            # Signed mm/year at the reference nominal when scaling is enabled.
+            response = (y - physics) / (data.years[data.eligible] * nominal_factor)
+            self.correction_.fit(correction_matrix, response)
             estimator = self.correction_[-1]
             correction_diagnostics = {"unit": "mm/year", "intercept": float(estimator.intercept_),
-                                      "coefficients": estimator.coef_.tolist()}
+                                      "coefficients": estimator.coef_.tolist(),
+                                      "feature_columns": correction_columns,
+                                      "reference_nominal_mm": self.reference_nominal_mm_}
             if self.options["residual_guard"] == "train-bounded":
                 guard_diagnostics = self.correction_[0].fit_diagnostics()
-                guard_diagnostics["train"] = self.correction_[0].diagnose(feature_matrix(train, self.feature_columns))
+                guard_diagnostics["train"] = self.correction_[0].diagnose(correction_matrix)
                 guard_diagnostics["last_predict"] = None
         if self.name == "hybrid_scale":
             self.scale_transformer_ = make_pipeline(
@@ -212,6 +243,8 @@ class PhysicsEstimator:
             "rate_columns": [] if self.name == "constant_rate" else list(RATE_COLUMNS),
             "feature_columns": list(self.feature_columns),
             "rate_parameters": self.rate_parameters_.tolist(), "optimizer": status,
+            "rate_unit": "mm/year", "reference_nominal_mm": self.reference_nominal_mm_,
+            "nominal_scaling": self.options["cold_nominal_scaling"],
             "residual_correction": correction_diagnostics, "last_predict_fallback_rows": 0,
             "residual_guard": guard_diagnostics,
             "scale_correction": scale_diagnostics,
@@ -248,11 +281,11 @@ class PhysicsEstimator:
             physical[eligible] = np.maximum(0, data.initial[eligible] - loss[eligible])
             prediction[eligible] = physical[eligible]
             if self.name == "hybrid_residual":
-                correction_features = feature_matrix(active, self.feature_columns)
+                correction_features, _ = self._correction_matrix(active)
                 correction = self.correction_.predict(correction_features)
                 if self.diagnostics_.get("residual_guard") is not None:
                     self.diagnostics_["residual_guard"]["last_predict"] = self.correction_[0].diagnose(correction_features)
-                prediction[eligible] += correction * data.years[eligible]
+                prediction[eligible] += correction * data.years[eligible] * self._nominal_factor(active)
         if prediction.shape != (len(frame),) or not np.isfinite(prediction).all():
             raise RuntimeError("Model produced a non-finite or incomplete prediction")
         self.diagnostics_["last_predict_fallback_rows"] = int((~eligible).sum())

@@ -78,7 +78,19 @@ def verify_shared_predictions(package, table, *, forecast=False):
             raise ValueError("Saved model predictions are not complete and finite")
 
 
-def run(prepared_dir, output_dir, contracts_dir="contracts"):
+def experiment_package(package, config):
+    """A declared allowlist ablation; canonical tables and folds stay shared."""
+    columns = config.get("physics_feature_columns")
+    if columns is None:
+        return package
+    if (not columns or len(columns) != len(set(columns))
+            or not set(columns).issubset(package["feature_columns"])
+            or any(not name.startswith("agent2_") for name in config["models"])):
+        raise ValueError("Physics ablation must be a nonempty subset of the shared allowlist")
+    return {**package, "feature_columns": list(columns)}
+
+
+def run(prepared_dir, output_dir, contracts_dir="contracts", *, configs=None, case_ids=None):
     prepared, output = Path(prepared_dir).resolve(), Path(output_dir).resolve()
     if output.exists():
         raise ValueError("Choose a new comparison output directory")
@@ -86,8 +98,12 @@ def run(prepared_dir, output_dir, contracts_dir="contracts"):
     hashes = {p.name: sha256(p.read_bytes()).hexdigest() for p in sorted(Path(contracts_dir).glob("*.yaml"))}
     if not summary["completed"] or summary["contract_sha256"] != hashes:
         raise ValueError("Prepared inputs are incomplete or have stale contracts")
-    configs = {f"{policy}/{variant}": comparison_config(policy, variant)
-               for policy in ["observed-only", "train-median"] for variant in ["original", "train-bounded"]}
+    if configs is None:
+        configs = {f"{policy}/{variant}": comparison_config(policy, variant)
+                   for policy in ["observed-only", "train-median"] for variant in ["original", "train-bounded"]}
+    selected_cases = [spec for spec in summary["cases"] if case_ids is None or spec["case_id"] in case_ids]
+    if not configs or not selected_cases or (case_ids is not None and set(case_ids) != {s["case_id"] for s in selected_cases}):
+        raise ValueError("No configurations or unknown requested cases")
     source = Path(__file__).resolve().parents[1]
     commit = subprocess.run(["git", "rev-parse", "HEAD"], text=True, capture_output=True, check=True).stdout.strip()
     provenance = {
@@ -109,7 +125,7 @@ def run(prepared_dir, output_dir, contracts_dir="contracts"):
         # The configuration is written before any call to the common evaluator.
         write_json(staging / "frozen_configs.json", configs)
         with threadpool_limits(limits=1):
-            for spec in summary["cases"]:
+            for spec in selected_cases:
                 case_id = spec["case_id"]
                 path = prepared / case_id / "prepared.joblib"
                 package = joblib.load(path)
@@ -120,11 +136,12 @@ def run(prepared_dir, output_dir, contracts_dir="contracts"):
                                                           "input_manifest": package["input_manifest"]}
                 for run_name, config in configs.items():
                     policy, variant = run_name.split("/")
+                    run_package = experiment_package(package, config)
                     directory = staging / policy / variant / case_id
                     directory.parent.mkdir(parents=True, exist_ok=True)
                     print(f"Agent2: {case_id}, {policy}, {variant}", flush=True)
                     tick = perf_counter()
-                    run_case(package, config, directory)
+                    run_case(run_package, config, directory)
                     elapsed = perf_counter() - tick
                     for name in tables:
                         extension = ".csv.gz" if name.endswith("predictions") else ".csv"
