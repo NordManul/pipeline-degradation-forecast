@@ -21,6 +21,18 @@ prediction_mm = model.predict(request_frame)
 
 ## Настройки
 
+- Эксперимент этапа 3: `cold_nominal_scaling="none"` (по умолчанию) или
+  `"train-relative"` только для cold. Опорный номинал — train-медиана,
+  скорость в мм/год и годовая остаточная поправка умножаются на отношение
+  номиналов. `diagnostics_` сохраняет reference_nominal_mm и единицы.
+- `residual_feature_map="identity"` (по умолчанию) или `"terrain-symmetric"`
+  только для hybrid_residual с allowlist ровно `slope_50m`, `lowpoint_depth_m`.
+  Второй режим использует модуль уклона и глубину понижения; имена преобразованных
+  признаков отражены в диагностике. Порядок исходного allowlist несущественен.
+- **Не включать новые опции по умолчанию:** [этап 3](CASE2_SEARCH_RESULTS.md)
+  не подтвердил существенный выигрыш кейса 2. При единственном обучающем номинале
+  8 мм OOF вообще не различает абсолютную и относительную потерю, хотя запросные
+  прогнозы отличаются до 1,37 мм. Для выбора нужны разрешённые независимые данные.
 - `missing_policy`: `observed-only` по умолчанию или `train-median`.
 - `rate_regularization=0.25`, `robust_delta_mm=0.5`, `residual_alpha=100.0`,
   `scale_regularization=1.0`, `max_nfev=2000`. Неизвестные параметры отклоняются.

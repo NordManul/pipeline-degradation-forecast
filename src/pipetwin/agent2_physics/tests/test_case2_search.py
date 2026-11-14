@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from pipetwin.agent2_physics.case2_search import assess_candidates
+from pipetwin.agent2_physics.case2_search import assess_candidates, nominal_identifiability, BASE_MODELS
 from pipetwin.agent2_physics.shared_comparison import experiment_package
 
 
@@ -62,3 +62,23 @@ def test_feature_ablation_preserves_shared_data_and_rejects_new_features():
             experiment_package(package, {**config, "physics_feature_columns": invalid})
     with pytest.raises(ValueError):
         experiment_package(package, {**config, "models": ["catboost"]})
+
+
+def test_identical_validation_does_not_imply_identical_target_forecasts():
+    pairs = [("references", "nominal-relative", name) for name in BASE_MODELS]
+    pairs += [("terrain-symmetric", "terrain-symmetric-relative", "agent2_hybrid_residual"),
+              ("terrain-scale", "terrain-scale-relative", "agent2_hybrid_scale")]
+    oof = pd.DataFrame([{"missing_policy": policy, "model": model, "variant": variant,
+                         "sample_id": sample, "raw_prediction_mm": value}
+                        for policy in ["observed-only", "train-median"]
+                        for a, b, model in pairs for variant in [a, b]
+                        for sample, value in [("a", 6.0), ("b", 6.5)]])
+    forecast = oof.iloc[::-1].copy()
+    forecast.loc[forecast.variant.str.endswith("relative"), "raw_prediction_mm"] -= 1.0
+    report = nominal_identifiability(oof, forecast)
+    assert report.oof_max_gap_mm.eq(0).all()
+    assert report.forecast_max_gap_mm.eq(1).all()
+    with pytest.raises(ValueError, match="sample keys"):
+        nominal_identifiability(oof.iloc[1:], forecast)
+    with pytest.raises(ValueError, match="sample keys"):
+        nominal_identifiability(pd.concat([oof, oof.iloc[[0]]]), forecast)

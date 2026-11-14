@@ -81,22 +81,55 @@ def assess_candidates(metrics, fold_metrics):
     return pd.DataFrame(records)
 
 
+def nominal_identifiability(oof, forecast):
+    """Compare paired hypotheses by key, without using any target labels."""
+    pairs = [("references", "nominal-relative", name) for name in BASE_MODELS]
+    pairs += [("terrain-symmetric", "terrain-symmetric-relative", "agent2_hybrid_residual"),
+              ("terrain-scale", "terrain-scale-relative", "agent2_hybrid_scale")]
+    records = []
+    for policy in ["observed-only", "train-median"]:
+        for absolute, relative, model in pairs:
+            record = {"missing_policy": policy, "absolute": absolute, "relative": relative, "model": model}
+            for kind, table in [("oof", oof), ("forecast", forecast)]:
+                chosen = table.loc[table.missing_policy.eq(policy) & table.model.eq(model)]
+                a = chosen.loc[chosen.variant.eq(absolute)].set_index("sample_id").sort_index()
+                b = chosen.loc[chosen.variant.eq(relative)].set_index("sample_id").sort_index()
+                if a.empty or not a.index.is_unique or not b.index.is_unique or not a.index.equals(b.index):
+                    raise ValueError("Nominal hypotheses require identical complete sample keys")
+                gap = (a.raw_prediction_mm - b.raw_prediction_mm).abs()
+                if not gap.notna().all():
+                    raise ValueError("Missing paired predictions")
+                record[f"{kind}_max_gap_mm"] = float(gap.max())
+                record[f"{kind}_mean_gap_mm"] = float(gap.mean())
+            records.append(record)
+    return pd.DataFrame(records)
+
+
+def write_assessment(output):
+    """Summarize saved shared scores; never refit or change the candidates."""
+    output = Path(output)
+    assessment = assess_candidates(pd.read_csv(output / "metrics.csv"), pd.read_csv(output / "metrics_by_fold.csv"))
+    assessment.to_csv(output / "candidate_assessment.csv", index=False)
+    pairs = nominal_identifiability(pd.read_csv(output / "oof_predictions.csv.gz"),
+                                    pd.read_csv(output / "forecast_predictions.csv.gz"))
+    pairs.to_csv(output / "nominal_identifiability.csv", index=False)
+    write_json(output / "research_conclusion.json", {
+        "protocol": "CASE2_SEARCH_PROTOCOL.md", "primary_missing_policy": "observed-only",
+        "auxiliary_gate_passes": int(assessment.passes_auxiliary_gate.sum()),
+        "nominal_hypotheses_oof_identical": bool(pairs.oof_max_gap_mm.eq(0).all()),
+        "target_transfer_validated": False, "independent_holdout": False,
+        "reason": "Only shared MAIN-2 2018 spatial folds; MAIN-4 target has no labels",
+    })
+    return assessment
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     provenance = run(args.prepared, args.output, configs=search_configs(), case_ids=["case2"])
-    metrics = pd.read_csv(args.output / "metrics.csv")
-    folds = pd.read_csv(args.output / "metrics_by_fold.csv")
-    assessment = assess_candidates(metrics, folds)
-    assessment.to_csv(args.output / "candidate_assessment.csv", index=False)
-    write_json(args.output / "research_conclusion.json", {
-        "protocol": "CASE2_SEARCH_PROTOCOL.md", "primary_missing_policy": "observed-only",
-        "auxiliary_gate_passes": int(assessment.passes_auxiliary_gate.sum()),
-        "target_transfer_validated": False, "independent_holdout": False,
-        "reason": "Only shared MAIN-2 2018 spatial folds; MAIN-4 target has no labels",
-    })
+    assessment = write_assessment(args.output)
     print(f"Completed {len(provenance['runs'])} runs; auxiliary gate passes: "
           f"{assessment.passes_auxiliary_gate.sum()}; target transfer remains unvalidated.")
 
