@@ -7,7 +7,8 @@
 
 ## Выполнено
 
-- `constant_rate`, `positive_rate`, `hybrid_residual`, каждый в `between` и `cold`.
+- `constant_rate`, `positive_rate`, `hybrid_residual` и дополнительный
+  `hybrid_scale`, каждый в `between` и `cold`.
 - Каноническая фабрика, отдельные case-контексты, проверки каждого календарного
   дня, окон и доступности источников/меток. Метка 2022-07-06 запрещена для кейса 2.
 - Калибровка between только с наблюдаемым якорем; точный fallback для остальных.
@@ -23,16 +24,56 @@
 & '../e02-venv/Scripts/python.exe' -m pytest src/pipetwin/agent2_physics/tests -q -W error
 ```
 
-Обязательная часть: **67 passed in 6.21s**. Данные всех тестов синтетические.
+Обязательная часть: **67 passed in 6.21s**, коммит `227fe8e`.
+После добавления hybrid_scale: **76 passed in 14.35s** в первом окружении.
+Данные всех тестов нового пакета синтетические.
 Проверены оба сценария пропусков, високосный год, разные окна одного ID, порядок
 строк, отсутствие двойного учёта дней, неправильные каналы и даты, изоляция
 validation и кейсов, обучение неконстантного сигнала, fallback, сырые прогнозы
 гибрида вне физического диапазона и воспроизведение после сериализации.
 
-Окружение: Python 3.13.4, numpy 2.1.3, pandas 2.2.3, scipy 1.14.1,
-scikit-learn 1.5.2, joblib 1.6.0, pytest 8.3.3. Это существующее локальное
-окружение, не точное воспроизведение `requirements-lock.txt`; повторение на
-общем закреплённом окружении остаётся частью интеграции. Новых зависимостей нет.
+Первое окружение: Python 3.13.4, numpy 2.1.3, pandas 2.2.3, scipy 1.14.1,
+scikit-learn 1.5.2, joblib 1.6.0, pytest 8.3.3.
+
+Затем создано отдельное проверочное окружение в
+`artifacts/agent2_physics/check-venv` с версиями из общего `requirements.txt`.
+Все общие тесты и тесты пакета запущены вместе:
+
+```powershell
+& 'artifacts/agent2_physics/check-venv/Scripts/python.exe' -m pytest tests src/pipetwin/agent2_physics/tests -q -W error --junitxml=artifacts/agent2_physics/contract-v1-tests.xml
+```
+
+Результат: **154 passed in 10.71s**, в том числе 76 тестов нового пакета.
+Python 3.13.4, numpy 2.2.6, pandas 2.2.3, scipy 1.15.3,
+scikit-learn 1.6.1, matplotlib 3.10.3, PyYAML 6.0.2, catboost 1.2.8,
+pytest 8.3.5, joblib 1.6.0. Прямые зависимости совпадают с requirements.txt;
+полный транзитивный requirements-lock.txt и Python 3.12 не воспроизводились.
+Новых зависимостей в проекте нет.
+
+## Воспроизводимый синтетический прогон
+
+```powershell
+$env:PYTHONPATH = 'src'
+& 'artifacts/agent2_physics/check-venv/Scripts/python.exe' -W error -m pipetwin.agent2_physics.synthetic_check --output artifacts/agent2_physics/contract-v1-synthetic
+```
+
+Выполнены 16 fit/replay: четыре модели, between/cold и observed-only/train-median.
+Записаны 128 прогнозов с уникальными составными ключами. Максимальное отклонение
+после joblib-перезагрузки: **0.0 мм**. Общий прогон занял 3.652 с, сумма fit —
+0.807 с, самый долгий fit — 0.099 с на этих небольших синтетических данных.
+Это проверка интерфейса и воспроизводимости, не рейтинг качества.
+
+Артефакты в игнорируемом каталоге `artifacts/agent2_physics/contract-v1-synthetic/`:
+
+- `report.json`: параметры всех вариантов, версии, SHA-256 кода, время и replay.
+- `predictions.csv`: case_id, sample_id, id, segment_id, target_date, fold_id,
+  model, missing_policy, prediction_mm и contract_version.
+- `*_train.csv`, `*_query.csv`, `*_exposure.csv`: исходные синтетические примеры.
+- 16 файлов joblib для повторного прогноза.
+
+Повторять команду нужно с новым каталогом. Данные, веса и проверочное окружение
+в Git не добавляются. Связь с реальными case_id намеренно не имитируется:
+в таблице стоят synthetic_between/synthetic_cold и fold_id=synthetic_probe.
 
 ## Ограничения
 
@@ -46,4 +87,6 @@ E03 не использовались как замена. Для следующ
 подтверждены текущими данными. Физическая модель — параметрическая аппроксимация;
 P и Q gas в закон не входят. Общий реестр и экспорт не изменены.
 
-Дополнительный `hybrid_scale` будет отмечен после отдельной реализации и тестов.
+Дополнительный hybrid_scale реализован после проверки и отдельного коммита
+обязательных моделей. Его множитель положителен и регуляризован; тесты проверяют
+обучение неконстантного сигнала и физическую монотонность в обоих сценариях.
