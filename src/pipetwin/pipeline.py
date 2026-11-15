@@ -14,8 +14,9 @@ from .case1 import FINAL_MODEL as CASE1_MODEL
 from .case1 import fit_case1, prepare_case1, score_late
 from .case2 import fit_case2, prepare_transfer
 from .models.cold_profile import FINAL_MODEL as CASE2_MODEL, PRIORITY_MODEL as CASE2_PRIORITY
-from .plots import plot_observed, plot_profiles, plot_validation
+from .plots import plot_dependencies, plot_observed, plot_profiles, plot_residuals, plot_stability, plot_validation
 from .quality import read_raw_sources
+from .reporting import write_report
 from .sources import read_config
 from .submission import KEYS, export_submission, rank_segments, validate_submission
 
@@ -56,7 +57,7 @@ def run(data_dir, output, template_path=None):
             warm_train, warm, late, config, cases["cases"]["case1"]["id"]
         )
         cold_values, cold_forest, transfer, cold_oof = fit_case2(cold_train, cold, seed, config["case2_validation_seeds"])
-    late_scores, late_audit = score_late(
+    late_scores, late_audit, late_oof = score_late(
         late, late_values, raw, strict, grid, target_contract, config, config["late"]["label_pool_cutoff_exclusive"]
     )
     warm_scores = pd.concat([historic, late_scores], ignore_index=True)
@@ -83,10 +84,13 @@ def run(data_dir, output, template_path=None):
         export_submission(predictions, template, result)
         metrics.to_csv(staged / "metrics.csv", index=False, float_format="%.12g", lineterminator="\n")
         priority.to_csv(staged / "priority_segments.csv", index=False, float_format="%.8f", lineterminator="\n")
-        _cleaning_summary(audits).to_csv(staged / "cleaning.csv", index=False)
-        plot_profiles(staged, warm, cold)
+        _cleaning_summary(audits).to_csv(staged / "cleaning.csv", index=False, lineterminator="\n")
+        plot_profiles(staged, warm, cold, priority)
         plot_validation(staged, warm_scores, transfer.loc[transfer.seed.eq(seed)])
-        plot_observed(staged, warm_oof, cold_oof)
+        plot_observed(staged, warm_oof, late_oof, cold_oof)
+        plot_dependencies(staged, warm_oof, cold_oof, cold)
+        plot_residuals(staged, warm_oof, late_oof, cold_oof)
+        plot_stability(staged, metrics)
         summary = {
             "result_sha256": sha256(result.read_bytes()).hexdigest(),
             "template": "organizer_file" if template_path else "passport_grid",
@@ -100,6 +104,7 @@ def run(data_dir, output, template_path=None):
             "sources": manifest,
         }
         (staged / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        write_report(staged, warm, cold, warm_oof, late_oof, cold_oof, priority, metrics, summary)
         staged.rename(output)
     return summary
 

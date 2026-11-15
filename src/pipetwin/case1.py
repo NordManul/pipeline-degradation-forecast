@@ -153,7 +153,7 @@ def fit_case1(train, query, late, config, target_id):
         rate = BetweenInspections(seed, annual_loss=True).fit(fit)
         values = {"persistence": direct.persistence(held), "annual_loss_blend": rate.predict(held),
                   FINAL_MODEL: direct.predict(held)}
-        pieces.append(held.assign(**values))
+        pieces.append(held.assign(**values, fold=fold.number + 1))
         target = held.id.eq(target_id)
         scores.append(score_predictions(held.loc[target], {name: pred[target] for name, pred in values.items()},
                                         f"spatial_fold_{fold.number + 1}"))
@@ -163,7 +163,7 @@ def fit_case1(train, query, late, config, target_id):
     rate = BetweenInspections(seed, annual_loss=True).fit(train)
     late_predictions = {"persistence": direct.persistence(late), "annual_loss_blend": rate.predict(late),
                         FINAL_MODEL: direct.predict(late)}
-    observed = oof.loc[oof.observed, ["id", "segment_id", "y_mm", FINAL_MODEL]].rename(
+    observed = oof.loc[oof.observed].rename(
         columns={FINAL_MODEL: "thickness_pred"}
     )
     return direct.predict(query), late_predictions, pd.concat(scores, ignore_index=True), observed
@@ -175,4 +175,9 @@ def score_late(late, predictions, raw, cleaned, grid, target_contract, config, f
         raw["inspection"], cleaned, config["late"]["ids"], target_contract, pd.Timestamp(freeze)
     )
     targets, _ = build_targets(replace(cleaned.sources, inspection=inspection), grid, target_contract)
-    return score_predictions(attach_labels(late, targets), predictions, "late_2023"), audit
+    labelled = attach_labels(late, targets)
+    scores = score_predictions(labelled, predictions, "late_2023")
+    observed = labelled.assign(**predictions).loc[labelled.observed].rename(
+        columns={FINAL_MODEL: "thickness_pred"}
+    )
+    return scores, audit, observed

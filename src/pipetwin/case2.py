@@ -87,8 +87,8 @@ def fit_case2(train, query, seed, validation_seeds):
             values = ColdProfile(trial_seed).fit(donor).predict(held)
             if trial_seed == seed:
                 values[CATBOOST_CONTROL] = ColdStart(seed).fit(donor).predict(held)
-                oof.append(held[["id", "segment_id", "main_id", "target_date", "observed", "y_mm"]]
-                           .assign(thickness_pred=values[FINAL_MODEL]).loc[lambda frame: frame.observed])
+                oof.append(held.assign(**values, thickness_pred=values[FINAL_MODEL])
+                           .loc[lambda frame: frame.observed])
             labelled = held.assign(**values).loc[held.observed]
             for date, group in labelled.groupby("target_date", sort=True):
                 rows.extend({"split": "holdout_main", "model": name, "held_main": main, "campaign": date,

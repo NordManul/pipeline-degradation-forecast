@@ -21,6 +21,9 @@ dependencies = {file = ["requirements.txt"]}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+pipetwin = ["templates/*.html"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

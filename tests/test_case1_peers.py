@@ -18,7 +18,7 @@ def test_peer_labels_join_after_building_strict_features(warm, data_inputs):
     assert "y_mm" not in query and "y_mm" not in late
     assert set(late.id) == {"1250009490", "1250011604"}
     assert late.anchor_date.eq(pd.Timestamp("2022-07-06")).all()
-    metrics, _ = score_late(late, {"example": np.linspace(7, 6, len(late))}, raw, cleaned, grid, contract, config,
+    metrics, _, _ = score_late(late, {"example": np.linspace(7, 6, len(late))}, raw, cleaned, grid, contract, config,
                             config["late"]["label_pool_cutoff_exclusive"])
     assert metrics.n.tolist() == [53]
 
