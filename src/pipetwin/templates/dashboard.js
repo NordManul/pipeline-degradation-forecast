@@ -18,17 +18,24 @@ const mm = value => Number.isFinite(value) ? fmt(value, 2) + " мм" : "—";
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const setText = (id, text) => { byId(id).textContent = text; };
 const hypot = Math.hypot;
-const predictions = {
+const rankingModels = {
   case1: "GAM + CatBoost",
   case2: "Random Forest"
 };
+const forecastModels = {
+  case1: "GAM + CatBoost",
+  case2: "XGBoost + KNN"
+};
+const caseTabs = Array.from(document.querySelectorAll("[data-case]"));
+const ringAngles = Array.from({length: 12}, (_, i) => i * 2 * Math.PI / 12);
 let activeCase = "case1";
-let rows, route, bounds, priorityRows, domain;
+let rows, route, bounds, priorityRows, domain, minThickness, maxThickness;
 let screenPoints = [];
 let frame = 0;
 
-function colour(ratio, light = 1) {
-  const value = clamp((ratio - .45) / .55, 0, 1) * 2;
+function colour(thickness, light = 1) {
+  const span = maxThickness - minThickness;
+  const value = span > 0 ? 2 * clamp((thickness - minThickness) / span, 0, 1) : 1;
   const stops = [[231, 135, 102], [219, 190, 114], [91, 214, 180]];
   const index = Math.min(1, Math.floor(value));
   return "rgb(" + stops[index].map((base, i) =>
@@ -42,6 +49,60 @@ function routeBounds(points) {
   const min = [0, 1, 2].map(i => Math.min(...usable.map(point => point[i])));
   const max = [0, 1, 2].map(i => Math.max(...usable.map(point => point[i])));
   return {min, max, mid: min.map((value, i) => (value + max[i]) / 2), count: usable.length};
+}
+
+function meshFaces(project, heightScale, radius) {
+  const points = route.map(point => point && [point[0], point[1], point[2] * heightScale]);
+  const ringAt = index => {
+    const a = points[index - 1], b = points[index];
+    const centre = a && b ? a.map((v, i) => (v + b[i]) / 2) : a ?? b;
+    if (!centre) return null;
+    const from = points[Math.max(0, index - 3)] ?? a ?? centre;
+    const to = points[Math.min(points.length - 1, index + 2)] ?? b ?? centre;
+    const [dx, dz, dy] = to.map((v, i) => v - from[i]);
+    const heading = Math.atan2(dz, dx);
+    const incline = Math.atan2(dy, hypot(dx, dz));
+    const sh = Math.sin(heading), ch = Math.cos(heading);
+    const si = Math.sin(incline), ci = Math.cos(incline);
+    const [east, north, altitude] = centre;
+    const origin = project(east, north, altitude / heightScale);
+    const vertices = ringAngles.map(angle => {
+      const lateral = Math.cos(angle) * radius, vertical = Math.sin(angle) * radius;
+      return project(east - lateral * sh - vertical * si * ch,
+        north + lateral * ch - vertical * si * sh, (altitude + vertical * ci) / heightScale);
+    });
+    return {origin, vertices};
+  };
+  const rings = Array.from({length: points.length + 1}, (_, i) => ringAt(i));
+  const faces = [];
+  const addFace = (vertices, fill) => {
+    const depth = vertices.reduce((sum, vertex) => sum + vertex[2], 0) / vertices.length;
+    faces.push({vertices, fill, depth});
+  };
+  const inset = (vertex, origin) => origin.map((v, i) => v + .66 * (vertex[i] - v));
+  points.forEach((point, index) => {
+    if (!point) return;
+    const start = rings[index], end = rings[index + 1];
+    const first = !points[index - 1], last = !points[index + 1];
+    const thickness = rows[index].thickness_pred;
+    for (let i = 0; i < ringAngles.length; i++) {
+      const j = (i + 1) % ringAngles.length;
+      const a = start.vertices[i], b = start.vertices[j], c = end.vertices[j], d = end.vertices[i];
+      const facing = (a[2] + b[2] + c[2] + d[2] - 2 * (start.origin[2] + end.origin[2])) / (4 * radius);
+      if (facing > -.02) {
+        const upward = (start.origin[1] - (a[1] + b[1]) / 2) + (end.origin[1] - (c[1] + d[1]) / 2);
+        const light = .60 + .25 * Math.max(0, facing) + .36 * (clamp(upward / 24, -1, 1) + 1) / 2;
+        addFace([a, b, c, d], colour(thickness, light));
+      }
+      if (first && start.origin[2] >= end.origin[2]) {
+        addFace([a, b, inset(b, start.origin), inset(a, start.origin)], colour(thickness, .9));
+      }
+      if (last && end.origin[2] >= start.origin[2]) {
+        addFace([c, d, inset(d, end.origin), inset(c, end.origin)], colour(thickness, .9));
+      }
+    }
+  });
+  return faces.sort((a, b) => a.depth - b.depth);
 }
 
 function drawScene() {
@@ -66,7 +127,8 @@ function drawScene() {
   const [east, north, elevation] = bounds.mid;
   const span = Math.max(1, hypot(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1],
     (bounds.max[2] - bounds.min[2]) * heightScale));
-  const scale = Math.min(width * .80, height * 1.15) / span * view.zoom;
+  const baseScale = Math.min(width * .84, height * 1.59) / span;
+  const scale = baseScale * view.zoom;
   const sy = Math.sin(view.yaw), cy = Math.cos(view.yaw);
   const sp = Math.sin(view.pitch), cp = Math.cos(view.pitch);
   function project(x, z, h) {
@@ -94,28 +156,20 @@ function drawScene() {
   context.stroke();
 
   screenPoints = route.map(point => point && project(...point));
-  const radius = clamp(Math.min(width, height) * .028 * Math.sqrt(view.zoom), 4, 21);
-  const slices = [];
-  // Draw each span from far to near. Concentric screen strokes shade the round cross-section.
-  for (let i = 1; i < screenPoints.length; i++) {
-    const a = screenPoints[i - 1], b = screenPoints[i];
-    if (a && b) slices.push({a, b, depth: (a[2] + b[2]) / 2, i});
-  }
-  slices.sort((a, b) => a.depth - b.depth);
-  context.lineCap = "round";
-  for (const {a, b, i} of slices) {
-    if (Math.max(a[0], b[0]) < -radius || Math.min(a[0], b[0]) > width + radius ||
-        Math.max(a[1], b[1]) < -radius || Math.min(a[1], b[1]) > height + radius) continue;
-    const ratio = rows[i].thickness_pred / rows[i].nominal_mm;
-    for (const [weight, shift, light] of [[2.1, 0, .36], [1.85, -.09, .67], [1.39, -.22, .93],
-      [.77, -.37, 1.12], [.21, -.55, 1.28]]) {
-      context.lineWidth = radius * weight;
-      context.strokeStyle = colour(ratio, light);
-      context.beginPath();
-      context.moveTo(a[0], a[1] + radius * shift);
-      context.lineTo(b[0], b[1] + radius * shift);
-      context.stroke();
-    }
+  const radius = clamp(Math.min(width, height) * .038, 7, 20);
+  context.lineJoin = "round";
+  context.lineWidth = .65;
+  for (const {vertices, fill} of meshFaces(project, heightScale, radius / baseScale)) {
+    if (vertices.every(v => v[0] < 0) || vertices.every(v => v[0] > width) ||
+        vertices.every(v => v[1] < 0) || vertices.every(v => v[1] > height)) continue;
+    context.beginPath();
+    context.moveTo(vertices[0][0], vertices[0][1]);
+    for (const [x, y] of vertices.slice(1)) context.lineTo(x, y);
+    context.closePath();
+    context.fillStyle = fill;
+    context.strokeStyle = fill;
+    context.fill();
+    context.stroke();
   }
   const occupied = new Set();
   const pointMarker = (point, size, color, fill) => {
@@ -139,7 +193,7 @@ function drawScene() {
   }
   const selected = screenPoints[chosen[activeCase]];
   if (selected) {
-    pointMarker(selected, radius + 4, "#f7fff9");
+    pointMarker(selected, radius * view.zoom + 4, "#f7fff9");
     pointMarker(selected, 4, "#f7fff9", "#15302e");
   }
 
@@ -241,22 +295,56 @@ function renderProfile() {
   svgElement(chart, "circle", {cx: px, cy: y(selected.thickness_pred), r: 4.5, fill: "#fff", stroke: "#143f34"});
 }
 
-function renderQuality() {
+function renderScores(warm, closed, open) {
+  const charts = byId("score-charts");
+  charts.replaceChildren();
+  for (const [key, title, direction] of [
+    ["pearson_squared", "Pearson²", "выше — лучше"], ["mae_mm", "MAE, мм", "ниже — лучше"]
+  ]) {
+    const group = document.createElement("div");
+    group.className = "score-metric";
+    const heading = document.createElement("h4");
+    const hint = document.createElement("span");
+    hint.textContent = direction;
+    heading.append(title + " · ", hint);
+    group.append(heading);
+    const max = key === "pearson_squared" ? 1 : Math.ceil(Math.max(1, closed?.[key] ?? 0, open?.[key] ?? 0));
+    for (const [style, label, metrics] of [
+      ["closed", "Закрытая", closed], ["open", "Открытая", open]
+    ]) {
+      const value = metrics?.[key];
+      const row = document.createElement("div");
+      row.className = "score-row " + style;
+      const tag = document.createElement("span");
+      tag.textContent = label;
+      const track = document.createElement("div");
+      track.className = "score-track";
+      track.setAttribute("aria-hidden", "true");
+      const bar = document.createElement("i");
+      bar.style.width = (Number.isFinite(value) ? 100 * clamp(value / max, 0, 1) : 0) + "%";
+      track.append(bar);
+      const output = document.createElement("output");
+      output.textContent = fmt(value, 3);
+      row.append(tag, track, output);
+      group.append(row);
+    }
+    const axis = document.createElement("div");
+    axis.className = "score-axis";
+    axis.setAttribute("aria-hidden", "true");
+    for (const value of [0, max]) {
+      const tick = document.createElement("span");
+      tick.textContent = fmt(value);
+      axis.append(tick);
+    }
+    group.append(axis);
+    charts.append(group);
+  }
+  setText("closed-note", closed ? "Закрытая — оценка организаторов для файла сдачи." : "Закрытая оценка для этого файла отсутствует.");
+  setText("open-note", warm ? "Открытая — поздние ВТД соседних участков." : "Открытая — среднее по кампаниям и магистралям.");
+}
+
+function renderScatter(rows, warm) {
   if (scatter.clientWidth < 80) return;
-  const warm = activeCase === "case1";
-  const split = warm ? "late_2023" : "holdout_main";
-  const rows = data.observations.filter(row => row.case === activeCase && row.split === split);
-  const closed = data.summary.closed_validation?.[activeCase];
-  const open = warm
-    ? data.metrics.find(row => row.case === activeCase && row.model === "direct_blend" && row.split === split)
-    : data.summary.case2_macro_validation.find(row => row.model === "xgboost_knn" && row.seed === data.summary.seed);
-  setText("closed-pearson", fmt(closed?.pearson_squared, 3));
-  setText("closed-mae", fmt(closed?.mae_mm, 3));
-  setText("closed-note", closed ? "Оценка организаторов, сообщённая командой для этого result.csv." : "Для этого файла оценка не зарегистрирована.");
-  setText("open-pearson", fmt(open?.pearson_squared, 3));
-  setText("open-mae", fmt(open?.mae_mm, 3));
-  setText("open-note", warm ? "Поздние ВТД соседних участков." : "Сначала среднее по кампаниям, затем по магистралям.");
-  setText("scatter-meta", fmt(rows.length) + " меток · " + (warm ? "поздние ВТД" : "MAIN-2 и MAIN-3 по очереди вне обучения"));
   if (!rows.length) {
     scatter.replaceChildren();
     return;
@@ -272,6 +360,21 @@ function renderQuality() {
     svgElement(scatter, "circle", {cx: x(row.y_mm), cy: y(row.thickness_pred), r: warm ? 3.7 : 2.7,
       fill: "#73dfc5", opacity: warm ? .77 : .25});
   }
+}
+
+function renderQuality() {
+  const warm = activeCase === "case1";
+  const split = warm ? "late_2023" : "holdout_main";
+  const observations = data.observations.filter(row => row.case === activeCase && row.split === split);
+  const closed = data.summary.closed_validation?.[activeCase];
+  const open = warm
+    ? data.metrics.find(row => row.case === activeCase && row.model === "direct_blend" && row.split === split)
+    : data.summary.case2_macro_validation.find(row => row.model === "xgboost_knn" && row.seed === data.summary.seed);
+  setText("forecast-model", "Итоговая модель · " + forecastModels[activeCase]);
+  setText("scatter-meta", fmt(observations.length) + " меток · " +
+    (warm ? "поздние ВТД" : "MAIN-2 и MAIN-3 по очереди вне обучения"));
+  renderScores(warm, closed, open);
+  renderScatter(observations, warm);
 }
 
 function selectSegment(index) {
@@ -297,6 +400,11 @@ function selectSegment(index) {
 function switchCase(next) {
   activeCase = next;
   rows = data.profiles.filter(item => item.case === next).sort((a, b) => a.segment_id - b.segment_id);
+  const thicknesses = rows.map(row => row.thickness_pred);
+  minThickness = Math.min(...thicknesses);
+  maxThickness = Math.max(...thicknesses);
+  setText("thickness-min", fmt(minThickness, 2));
+  setText("thickness-max", fmt(maxThickness, 2));
   route = data.routes[rows[0].id] ?? [];
   bounds = routeBounds(route);
   screenPoints = [];
@@ -305,16 +413,20 @@ function switchCase(next) {
   priority.replaceChildren(new Option("Выбрать · " + fmt(priorityRows.length) + " сегм.", ""));
   for (const row of priorityRows) priority.add(new Option(
     "№" + row.rank + " · сегм. " + row.segment_id + " · " + mm(row.thickness_pred), row.segment_id));
-  setText("ranking-model", predictions[next] + " формирует список приоритетов.");
+  setText("ranking-model", rankingModels[next] + " формирует список приоритетов.");
   const date = rows[0].target_date.slice(0, 10).split("-").reverse().join(".");
   setText("route-meta", rows[0].id + " / " + date + " / " + fmt(rows[rows.length - 1].end_m / 1000, 2) + " км");
   setText("route-coverage", bounds && bounds.count < rows.length ? fmt(bounds.count) + " из " + fmt(rows.length) + " сегм. с координатами" : "");
   byId("segment").max = rows.length - 1;
   byId("anchor-key").hidden = !rows.some(row => row.anchor_observed);
-  for (const button of document.querySelectorAll("[data-case]")) {
-    button.setAttribute("aria-pressed", String(button.dataset.case === next));
+  for (const button of caseTabs) {
+    const selected = button.dataset.case === next;
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
   }
+  byId("case-panel").setAttribute("aria-labelledby", "tab-" + next);
   Object.assign(view, initialView);
+  if (next === "case2") view.yaw -= .26;
   selectSegment(chosen[next] ?? priorityRows[0]?.segment_id ?? 0);
   renderQuality();
 }
@@ -334,6 +446,7 @@ byId("zoom-in").addEventListener("click", () => zoom(1.23));
 byId("zoom-out").addEventListener("click", () => zoom(1 / 1.23));
 byId("reset-view").addEventListener("click", () => {
   Object.assign(view, initialView);
+  if (activeCase === "case2") view.yaw -= .26;
   redrawScene();
 });
 canvas.addEventListener("keydown", event => {
@@ -346,7 +459,7 @@ canvas.addEventListener("keydown", event => {
   if (key === "ArrowDown") view.pitch = clamp(view.pitch - .1, -.95, 1.4);
   if (key === "+" || key === "=") zoom(1.23);
   if (key === "-") zoom(1 / 1.23);
-  if (key === "Home") Object.assign(view, initialView);
+  if (key === "Home") byId("reset-view").click();
   redrawScene();
 });
 canvas.addEventListener("wheel", event => {
@@ -398,8 +511,16 @@ chart.addEventListener("click", event => {
     Math.abs(row.center_m - position) < Math.abs(best.center_m - position) ? row : best);
   selectSegment(nearest.segment_id);
 });
-for (const button of document.querySelectorAll("[data-case]")) {
+for (const [index, button] of caseTabs.entries()) {
   button.addEventListener("click", () => switchCase(button.dataset.case));
+  button.addEventListener("keydown", event => {
+    const target = {ArrowLeft: (index - 1 + caseTabs.length) % caseTabs.length,
+      ArrowRight: (index + 1) % caseTabs.length, Home: 0, End: caseTabs.length - 1}[event.key];
+    if (target === undefined) return;
+    event.preventDefault();
+    caseTabs[target].focus();
+    switchCase(caseTabs[target].dataset.case);
+  });
 }
 for (const button of document.querySelectorAll("[data-file]")) {
   button.addEventListener("click", () => {

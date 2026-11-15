@@ -110,11 +110,11 @@ def _overview(output, profiles, routes):
                      'stroke-linecap="round" stroke-linejoin="round"/>')
     cells = f"{len(profiles):,}".replace(",", " ")
     svg = ('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="316" viewBox="0 0 1200 316">'
-           '<title>PipeTwin. Прогноз остаточной толщины на двух участках</title>'
+           '<title>degradation forecast. Прогноз остаточной толщины на двух участках</title>'
            '<rect width="1200" height="316" rx="20" fill="#091319"/>'
            '<g font-family="Segoe UI,DejaVu Sans,sans-serif">'
            '<circle cx="52" cy="51" r="8" fill="none" stroke="#73dfc5" stroke-width="3"/>'
-           '<text x="70" y="59" font-size="22" font-weight="700" fill="#edf4f2">PipeTwin</text>'
+           '<text x="70" y="59" font-size="22" font-weight="700" fill="#edf4f2">degradation forecast</text>'
            '<text x="42" y="129" font-size="48" font-weight="700" fill="#edf4f2">Толщина стенки</text>'
            '<text x="42" y="185" font-size="48" font-weight="700" fill="#edf4f2">вдоль трубопровода</text>'
            '<path d="M42 217H748" stroke="#294047"/>'

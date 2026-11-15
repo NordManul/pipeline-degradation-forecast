@@ -29,7 +29,7 @@ button:hover, select:hover { border-color: var(--teal); }
   margin-inline: auto;
 }
 .top {
-  min-height: 74px;
+  min-height: 60px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -44,14 +44,24 @@ button:hover, select:hover { border-color: var(--teal); }
 .primary { background: var(--teal); color: #0d211f; border-color: var(--teal); font-weight: 700; }
 .primary:hover { background: #abf6e6; }
 main { padding-bottom: 36px; }
-.intro { padding: clamp(36px, 5vw, 72px) 0 26px; }
-.intro h1 { margin: 0; font-size: clamp(2.25rem, 5.3vw, 5.25rem); line-height: 1.02; letter-spacing: -.063em; font-weight: 690; }
-.intro p { margin: 16px 0 0; color: var(--muted); max-width: 46ch; line-height: 1.5; }
-.cases { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
-.cases button { padding: .7rem .9rem; font-weight: 700; }
+.intro { padding: clamp(22px, 3.1vw, 45px) 0 15px; }
+.intro h1 { margin: 0; font-size: clamp(1.9rem, 5.1vw, 4.65rem); line-height: 1.04; letter-spacing: -.058em; font-weight: 690; }
+.intro p { margin: 10px 0 0; color: var(--muted); line-height: 1.5; }
+.cases {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 210px));
+  gap: 8px;
+  padding: 8px 0 13px;
+  background: #091319;
+}
+.cases button { padding: .64rem .8rem; font-weight: 700; text-align: left; }
 .cases button span { margin-left: .36rem; font-size: .82rem; font-weight: 450; color: var(--muted); }
-.cases [aria-pressed="true"] { background: #173c39; border-color: var(--teal); color: var(--teal); }
-.cases [aria-pressed="true"] span { color: #d2e9e3; }
+.cases [aria-selected="true"] { background: #173c39; border-color: var(--teal); color: var(--teal); }
+.cases [aria-selected="true"] span { color: #d2e9e3; }
+#profile, #quality { scroll-margin-top: 75px; }
 .workspace, .quality-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(245px, .35fr); gap: 16px; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; min-width: 0; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 20px 22px 14px; }
@@ -98,9 +108,17 @@ dd { margin: 0; font-weight: 650; }
 .section-head { padding: 34px 0 14px; }
 .quality-grid { grid-template-columns: minmax(228px, .55fr) minmax(0, 1fr); }
 .scores, .scatter { padding: 20px 22px; }
-.scores h3:not(:first-child) { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
-.metric-pair { margin: 12px 0 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.metric-pair dd { font-size: clamp(1.55rem, 3vw, 2.35rem); color: var(--teal); margin-top: 3px; }
+.score-charts { display: grid; gap: 16px; margin: 12px 0 10px; }
+.score-metric { display: grid; gap: 6px; }
+.score-metric h4 { margin: 0; font-size: .92rem; }
+.score-metric h4 span { font-size: .74rem; font-weight: 450; color: var(--muted); }
+.score-row { display: grid; grid-template-columns: 5.9rem minmax(36px, 1fr) 3rem; align-items: center; gap: 8px; }
+.score-row span { font-size: .76rem; color: var(--muted); }
+.score-row output { font-variant-numeric: tabular-nums; text-align: right; font-size: .9rem; font-weight: 650; }
+.score-track { height: 7px; border-radius: 3px; overflow: hidden; background: #294047; }
+.score-track i { display: block; height: 100%; background: var(--teal); }
+.score-row.open .score-track i { background: #92aafa; }
+.score-axis { display: flex; justify-content: space-between; margin: 0 3.5rem 0 6.4rem; font-size: .67rem; color: var(--muted); }
 .scatter .chart-wrap { padding: 5px 0 0; }
 .exports { margin-top: 16px; padding: 20px 22px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .file-buttons { gap: 8px; }
@@ -115,6 +133,9 @@ dd { margin: 0; font-weight: 650; }
   .top { min-height: 62px; gap: 8px; }
   .top nav { gap: 10px; }
   .top nav a { display: none; }
+  .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cases button span { display: block; margin: 3px 0 0; }
+  #profile, #quality { scroll-margin-top: 84px; }
   .workspace, .quality-grid { grid-template-columns: minmax(0, 1fr); }
   .panel-head { padding: 16px 14px 12px; }
   #scene { height: 290px; }

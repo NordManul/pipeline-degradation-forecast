@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>PipeTwin · Толщина стенки</title>
+  <title>degradation forecast</title>
   <style>@@STYLES@@</style>
 </head>
 <body>
   <header class="top">
-    <a class="wordmark" href="#top"><span aria-hidden="true"></span> PipeTwin</a>
+    <a class="wordmark" href="https://github.com/NordManul/pipeline-degradation-forecast"><span aria-hidden="true"></span> GitHub</a>
     <nav aria-label="Разделы">
       <a href="#profile">Профиль</a>
       <a href="#quality">Качество</a>
@@ -18,17 +18,18 @@
   </header>
   <main id="top">
     <section class="intro" aria-labelledby="title">
-      <h1 id="title">Толщина стенки<br>вдоль трубопровода</h1>
-      <p>Трасса, прогноз остаточной толщины и сегменты с приоритетом обследования.</p>
+      <h1 id="title">degradation forecast</h1>
+      <p>Прогноз остаточной толщины стенки на двух участках трубопровода.</p>
     </section>
-    <div class="cases" role="group" aria-label="Участок">
-      <button type="button" data-case="case1" aria-pressed="true">Кейс 1 <span>С прошлым ВТД</span></button>
-      <button type="button" data-case="case2" aria-pressed="false">Кейс 2 <span>Без прошлого ВТД</span></button>
+    <div class="cases" role="tablist" aria-label="Участки трубопровода">
+      <button type="button" id="tab-case1" data-case="case1" role="tab" aria-selected="true" aria-controls="case-panel">Кейс 1 <span>С прошлым ВТД</span></button>
+      <button type="button" id="tab-case2" data-case="case2" role="tab" aria-selected="false" aria-controls="case-panel" tabindex="-1">Кейс 2 <span>Без прошлого ВТД</span></button>
     </div>
+    <div id="case-panel" role="tabpanel" aria-labelledby="tab-case1">
     <section class="workspace" aria-labelledby="route-title">
       <div class="panel route">
         <header class="panel-head">
-          <div><div id="route-meta" class="eyebrow"></div><h2 id="route-title">Маршрут в 3D</h2></div>
+          <div><div id="route-meta" class="eyebrow"></div><h2 id="route-title">Труба в 3D</h2></div>
           <label class="scale">Рельеф
             <select id="height-scale" aria-label="Масштаб высоты">
               <option value="1">×1</option><option value="4">×4</option><option value="8" selected>×8</option><option value="16">×16</option>
@@ -45,11 +46,11 @@
           <span id="route-coverage" class="route-coverage"></span>
         </div>
         <div class="route-footer">
-          <div class="legend" aria-label="Цвет показывает долю от номинальной толщины. Нижняя граница 45 процентов.">
-            <span>От номинала</span><span>≤45%</span><span class="ramp"></span><span>100%</span>
+          <div class="legend">
+            <span>Прогноз, мм</span><span id="thickness-min"></span><span class="ramp" aria-hidden="true"></span><span id="thickness-max"></span>
             <span class="marker-legend">Приоритет обследования</span>
           </div>
-          <p class="note">Перетащите трассу для вращения. Диаметр увеличен для читаемости.</p>
+          <p class="note">Коралловый — тоньше, бирюзовый — толще. Перетащите трубу для вращения. Диаметр увеличен для читаемости.</p>
         </div>
       </div>
       <aside class="panel detail" aria-labelledby="segment-title">
@@ -81,22 +82,22 @@
       <div class="chart-wrap"><svg id="section-chart" role="img" aria-label="Толщина в миллиметрах по длине участка. Щелчок по графику выбирает сегмент."></svg></div>
     </section>
     <section id="quality" aria-labelledby="quality-title">
-      <header class="section-head"><h2 id="quality-title">Качество прогноза</h2><p>Закрытая проверка и воспроизводимый контроль на выданных измерениях.</p></header>
+      <header class="section-head"><h2 id="quality-title">Качество прогноза</h2><p id="forecast-model"></p></header>
       <div class="quality-grid">
-        <article class="panel scores">
-          <h3>Закрытая проверка</h3>
-          <dl class="metric-pair"><div><dt>Pearson²</dt><dd id="closed-pearson"></dd></div><div><dt>MAE, мм</dt><dd id="closed-mae"></dd></div></dl>
+        <article class="panel scores" aria-labelledby="scores-title">
+          <h3 id="scores-title">Метрики</h3>
+          <div id="score-charts" class="score-charts"></div>
           <p id="closed-note" class="note"></p>
-          <h3>Открытая валидация</h3>
-          <dl class="metric-pair"><div><dt>Pearson²</dt><dd id="open-pearson"></dd></div><div><dt>MAE, мм</dt><dd id="open-mae"></dd></div></dl>
           <p id="open-note" class="note"></p>
         </article>
         <article class="panel scatter">
           <h3>Прогноз против факта</h3><p id="scatter-meta" class="muted"></p>
           <div class="chart-wrap"><svg id="scatter-chart" role="img" aria-label="Прогноз и наблюдаемая толщина на открытом контроле. Диагональ соответствует точному прогнозу."></svg></div>
+          <p class="note">Пунктир показывает точное совпадение. Точки выше — прогноз толще замера.</p>
         </article>
       </div>
     </section>
+    </div>
     <footer class="panel exports">
       <div><h2>Данные отчёта</h2><p class="note">CSV с исходными рядами графиков и контрольными метриками.</p></div>
       <div class="file-buttons">

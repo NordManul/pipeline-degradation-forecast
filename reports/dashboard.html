@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>PipeTwin · Толщина стенки</title>
+  <title>degradation forecast</title>
   <style>:root {
   color-scheme: dark;
   font-family: "Inter", "Segoe UI", system-ui, sans-serif;
@@ -36,7 +36,7 @@ button:hover, select:hover { border-color: var(--teal); }
   margin-inline: auto;
 }
 .top {
-  min-height: 74px;
+  min-height: 60px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -51,14 +51,24 @@ button:hover, select:hover { border-color: var(--teal); }
 .primary { background: var(--teal); color: #0d211f; border-color: var(--teal); font-weight: 700; }
 .primary:hover { background: #abf6e6; }
 main { padding-bottom: 36px; }
-.intro { padding: clamp(36px, 5vw, 72px) 0 26px; }
-.intro h1 { margin: 0; font-size: clamp(2.25rem, 5.3vw, 5.25rem); line-height: 1.02; letter-spacing: -.063em; font-weight: 690; }
-.intro p { margin: 16px 0 0; color: var(--muted); max-width: 46ch; line-height: 1.5; }
-.cases { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
-.cases button { padding: .7rem .9rem; font-weight: 700; }
+.intro { padding: clamp(22px, 3.1vw, 45px) 0 15px; }
+.intro h1 { margin: 0; font-size: clamp(1.9rem, 5.1vw, 4.65rem); line-height: 1.04; letter-spacing: -.058em; font-weight: 690; }
+.intro p { margin: 10px 0 0; color: var(--muted); line-height: 1.5; }
+.cases {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 210px));
+  gap: 8px;
+  padding: 8px 0 13px;
+  background: #091319;
+}
+.cases button { padding: .64rem .8rem; font-weight: 700; text-align: left; }
 .cases button span { margin-left: .36rem; font-size: .82rem; font-weight: 450; color: var(--muted); }
-.cases [aria-pressed="true"] { background: #173c39; border-color: var(--teal); color: var(--teal); }
-.cases [aria-pressed="true"] span { color: #d2e9e3; }
+.cases [aria-selected="true"] { background: #173c39; border-color: var(--teal); color: var(--teal); }
+.cases [aria-selected="true"] span { color: #d2e9e3; }
+#profile, #quality { scroll-margin-top: 75px; }
 .workspace, .quality-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(245px, .35fr); gap: 16px; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; min-width: 0; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 20px 22px 14px; }
@@ -105,9 +115,17 @@ dd { margin: 0; font-weight: 650; }
 .section-head { padding: 34px 0 14px; }
 .quality-grid { grid-template-columns: minmax(228px, .55fr) minmax(0, 1fr); }
 .scores, .scatter { padding: 20px 22px; }
-.scores h3:not(:first-child) { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
-.metric-pair { margin: 12px 0 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.metric-pair dd { font-size: clamp(1.55rem, 3vw, 2.35rem); color: var(--teal); margin-top: 3px; }
+.score-charts { display: grid; gap: 16px; margin: 12px 0 10px; }
+.score-metric { display: grid; gap: 6px; }
+.score-metric h4 { margin: 0; font-size: .92rem; }
+.score-metric h4 span { font-size: .74rem; font-weight: 450; color: var(--muted); }
+.score-row { display: grid; grid-template-columns: 5.9rem minmax(36px, 1fr) 3rem; align-items: center; gap: 8px; }
+.score-row span { font-size: .76rem; color: var(--muted); }
+.score-row output { font-variant-numeric: tabular-nums; text-align: right; font-size: .9rem; font-weight: 650; }
+.score-track { height: 7px; border-radius: 3px; overflow: hidden; background: #294047; }
+.score-track i { display: block; height: 100%; background: var(--teal); }
+.score-row.open .score-track i { background: #92aafa; }
+.score-axis { display: flex; justify-content: space-between; margin: 0 3.5rem 0 6.4rem; font-size: .67rem; color: var(--muted); }
 .scatter .chart-wrap { padding: 5px 0 0; }
 .exports { margin-top: 16px; padding: 20px 22px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .file-buttons { gap: 8px; }
@@ -122,6 +140,9 @@ dd { margin: 0; font-weight: 650; }
   .top { min-height: 62px; gap: 8px; }
   .top nav { gap: 10px; }
   .top nav a { display: none; }
+  .cases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cases button span { display: block; margin: 3px 0 0; }
+  #profile, #quality { scroll-margin-top: 84px; }
   .workspace, .quality-grid { grid-template-columns: minmax(0, 1fr); }
   .panel-head { padding: 16px 14px 12px; }
   #scene { height: 290px; }
@@ -135,7 +156,7 @@ dd { margin: 0; font-weight: 650; }
 </head>
 <body>
   <header class="top">
-    <a class="wordmark" href="#top"><span aria-hidden="true"></span> PipeTwin</a>
+    <a class="wordmark" href="https://github.com/NordManul/pipeline-degradation-forecast"><span aria-hidden="true"></span> GitHub</a>
     <nav aria-label="Разделы">
       <a href="#profile">Профиль</a>
       <a href="#quality">Качество</a>
@@ -144,17 +165,18 @@ dd { margin: 0; font-weight: 650; }
   </header>
   <main id="top">
     <section class="intro" aria-labelledby="title">
-      <h1 id="title">Толщина стенки<br>вдоль трубопровода</h1>
-      <p>Трасса, прогноз остаточной толщины и сегменты с приоритетом обследования.</p>
+      <h1 id="title">degradation forecast</h1>
+      <p>Прогноз остаточной толщины стенки на двух участках трубопровода.</p>
     </section>
-    <div class="cases" role="group" aria-label="Участок">
-      <button type="button" data-case="case1" aria-pressed="true">Кейс 1 <span>С прошлым ВТД</span></button>
-      <button type="button" data-case="case2" aria-pressed="false">Кейс 2 <span>Без прошлого ВТД</span></button>
+    <div class="cases" role="tablist" aria-label="Участки трубопровода">
+      <button type="button" id="tab-case1" data-case="case1" role="tab" aria-selected="true" aria-controls="case-panel">Кейс 1 <span>С прошлым ВТД</span></button>
+      <button type="button" id="tab-case2" data-case="case2" role="tab" aria-selected="false" aria-controls="case-panel" tabindex="-1">Кейс 2 <span>Без прошлого ВТД</span></button>
     </div>
+    <div id="case-panel" role="tabpanel" aria-labelledby="tab-case1">
     <section class="workspace" aria-labelledby="route-title">
       <div class="panel route">
         <header class="panel-head">
-          <div><div id="route-meta" class="eyebrow"></div><h2 id="route-title">Маршрут в 3D</h2></div>
+          <div><div id="route-meta" class="eyebrow"></div><h2 id="route-title">Труба в 3D</h2></div>
           <label class="scale">Рельеф
             <select id="height-scale" aria-label="Масштаб высоты">
               <option value="1">×1</option><option value="4">×4</option><option value="8" selected>×8</option><option value="16">×16</option>
@@ -171,11 +193,11 @@ dd { margin: 0; font-weight: 650; }
           <span id="route-coverage" class="route-coverage"></span>
         </div>
         <div class="route-footer">
-          <div class="legend" aria-label="Цвет показывает долю от номинальной толщины. Нижняя граница 45 процентов.">
-            <span>От номинала</span><span>≤45%</span><span class="ramp"></span><span>100%</span>
+          <div class="legend">
+            <span>Прогноз, мм</span><span id="thickness-min"></span><span class="ramp" aria-hidden="true"></span><span id="thickness-max"></span>
             <span class="marker-legend">Приоритет обследования</span>
           </div>
-          <p class="note">Перетащите трассу для вращения. Диаметр увеличен для читаемости.</p>
+          <p class="note">Коралловый — тоньше, бирюзовый — толще. Перетащите трубу для вращения. Диаметр увеличен для читаемости.</p>
         </div>
       </div>
       <aside class="panel detail" aria-labelledby="segment-title">
@@ -207,22 +229,22 @@ dd { margin: 0; font-weight: 650; }
       <div class="chart-wrap"><svg id="section-chart" role="img" aria-label="Толщина в миллиметрах по длине участка. Щелчок по графику выбирает сегмент."></svg></div>
     </section>
     <section id="quality" aria-labelledby="quality-title">
-      <header class="section-head"><h2 id="quality-title">Качество прогноза</h2><p>Закрытая проверка и воспроизводимый контроль на выданных измерениях.</p></header>
+      <header class="section-head"><h2 id="quality-title">Качество прогноза</h2><p id="forecast-model"></p></header>
       <div class="quality-grid">
-        <article class="panel scores">
-          <h3>Закрытая проверка</h3>
-          <dl class="metric-pair"><div><dt>Pearson²</dt><dd id="closed-pearson"></dd></div><div><dt>MAE, мм</dt><dd id="closed-mae"></dd></div></dl>
+        <article class="panel scores" aria-labelledby="scores-title">
+          <h3 id="scores-title">Метрики</h3>
+          <div id="score-charts" class="score-charts"></div>
           <p id="closed-note" class="note"></p>
-          <h3>Открытая валидация</h3>
-          <dl class="metric-pair"><div><dt>Pearson²</dt><dd id="open-pearson"></dd></div><div><dt>MAE, мм</dt><dd id="open-mae"></dd></div></dl>
           <p id="open-note" class="note"></p>
         </article>
         <article class="panel scatter">
           <h3>Прогноз против факта</h3><p id="scatter-meta" class="muted"></p>
           <div class="chart-wrap"><svg id="scatter-chart" role="img" aria-label="Прогноз и наблюдаемая толщина на открытом контроле. Диагональ соответствует точному прогнозу."></svg></div>
+          <p class="note">Пунктир показывает точное совпадение. Точки выше — прогноз толще замера.</p>
         </article>
       </div>
     </section>
+    </div>
     <footer class="panel exports">
       <div><h2>Данные отчёта</h2><p class="note">CSV с исходными рядами графиков и контрольными метриками.</p></div>
       <div class="file-buttons">
@@ -257,17 +279,24 @@ const mm = value => Number.isFinite(value) ? fmt(value, 2) + " мм" : "—";
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const setText = (id, text) => { byId(id).textContent = text; };
 const hypot = Math.hypot;
-const predictions = {
+const rankingModels = {
   case1: "GAM + CatBoost",
   case2: "Random Forest"
 };
+const forecastModels = {
+  case1: "GAM + CatBoost",
+  case2: "XGBoost + KNN"
+};
+const caseTabs = Array.from(document.querySelectorAll("[data-case]"));
+const ringAngles = Array.from({length: 12}, (_, i) => i * 2 * Math.PI / 12);
 let activeCase = "case1";
-let rows, route, bounds, priorityRows, domain;
+let rows, route, bounds, priorityRows, domain, minThickness, maxThickness;
 let screenPoints = [];
 let frame = 0;
 
-function colour(ratio, light = 1) {
-  const value = clamp((ratio - .45) / .55, 0, 1) * 2;
+function colour(thickness, light = 1) {
+  const span = maxThickness - minThickness;
+  const value = span > 0 ? 2 * clamp((thickness - minThickness) / span, 0, 1) : 1;
   const stops = [[231, 135, 102], [219, 190, 114], [91, 214, 180]];
   const index = Math.min(1, Math.floor(value));
   return "rgb(" + stops[index].map((base, i) =>
@@ -281,6 +310,60 @@ function routeBounds(points) {
   const min = [0, 1, 2].map(i => Math.min(...usable.map(point => point[i])));
   const max = [0, 1, 2].map(i => Math.max(...usable.map(point => point[i])));
   return {min, max, mid: min.map((value, i) => (value + max[i]) / 2), count: usable.length};
+}
+
+function meshFaces(project, heightScale, radius) {
+  const points = route.map(point => point && [point[0], point[1], point[2] * heightScale]);
+  const ringAt = index => {
+    const a = points[index - 1], b = points[index];
+    const centre = a && b ? a.map((v, i) => (v + b[i]) / 2) : a ?? b;
+    if (!centre) return null;
+    const from = points[Math.max(0, index - 3)] ?? a ?? centre;
+    const to = points[Math.min(points.length - 1, index + 2)] ?? b ?? centre;
+    const [dx, dz, dy] = to.map((v, i) => v - from[i]);
+    const heading = Math.atan2(dz, dx);
+    const incline = Math.atan2(dy, hypot(dx, dz));
+    const sh = Math.sin(heading), ch = Math.cos(heading);
+    const si = Math.sin(incline), ci = Math.cos(incline);
+    const [east, north, altitude] = centre;
+    const origin = project(east, north, altitude / heightScale);
+    const vertices = ringAngles.map(angle => {
+      const lateral = Math.cos(angle) * radius, vertical = Math.sin(angle) * radius;
+      return project(east - lateral * sh - vertical * si * ch,
+        north + lateral * ch - vertical * si * sh, (altitude + vertical * ci) / heightScale);
+    });
+    return {origin, vertices};
+  };
+  const rings = Array.from({length: points.length + 1}, (_, i) => ringAt(i));
+  const faces = [];
+  const addFace = (vertices, fill) => {
+    const depth = vertices.reduce((sum, vertex) => sum + vertex[2], 0) / vertices.length;
+    faces.push({vertices, fill, depth});
+  };
+  const inset = (vertex, origin) => origin.map((v, i) => v + .66 * (vertex[i] - v));
+  points.forEach((point, index) => {
+    if (!point) return;
+    const start = rings[index], end = rings[index + 1];
+    const first = !points[index - 1], last = !points[index + 1];
+    const thickness = rows[index].thickness_pred;
+    for (let i = 0; i < ringAngles.length; i++) {
+      const j = (i + 1) % ringAngles.length;
+      const a = start.vertices[i], b = start.vertices[j], c = end.vertices[j], d = end.vertices[i];
+      const facing = (a[2] + b[2] + c[2] + d[2] - 2 * (start.origin[2] + end.origin[2])) / (4 * radius);
+      if (facing > -.02) {
+        const upward = (start.origin[1] - (a[1] + b[1]) / 2) + (end.origin[1] - (c[1] + d[1]) / 2);
+        const light = .60 + .25 * Math.max(0, facing) + .36 * (clamp(upward / 24, -1, 1) + 1) / 2;
+        addFace([a, b, c, d], colour(thickness, light));
+      }
+      if (first && start.origin[2] >= end.origin[2]) {
+        addFace([a, b, inset(b, start.origin), inset(a, start.origin)], colour(thickness, .9));
+      }
+      if (last && end.origin[2] >= start.origin[2]) {
+        addFace([c, d, inset(d, end.origin), inset(c, end.origin)], colour(thickness, .9));
+      }
+    }
+  });
+  return faces.sort((a, b) => a.depth - b.depth);
 }
 
 function drawScene() {
@@ -305,7 +388,8 @@ function drawScene() {
   const [east, north, elevation] = bounds.mid;
   const span = Math.max(1, hypot(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1],
     (bounds.max[2] - bounds.min[2]) * heightScale));
-  const scale = Math.min(width * .80, height * 1.15) / span * view.zoom;
+  const baseScale = Math.min(width * .84, height * 1.59) / span;
+  const scale = baseScale * view.zoom;
   const sy = Math.sin(view.yaw), cy = Math.cos(view.yaw);
   const sp = Math.sin(view.pitch), cp = Math.cos(view.pitch);
   function project(x, z, h) {
@@ -333,28 +417,20 @@ function drawScene() {
   context.stroke();
 
   screenPoints = route.map(point => point && project(...point));
-  const radius = clamp(Math.min(width, height) * .028 * Math.sqrt(view.zoom), 4, 21);
-  const slices = [];
-  // Draw each span from far to near. Concentric screen strokes shade the round cross-section.
-  for (let i = 1; i < screenPoints.length; i++) {
-    const a = screenPoints[i - 1], b = screenPoints[i];
-    if (a && b) slices.push({a, b, depth: (a[2] + b[2]) / 2, i});
-  }
-  slices.sort((a, b) => a.depth - b.depth);
-  context.lineCap = "round";
-  for (const {a, b, i} of slices) {
-    if (Math.max(a[0], b[0]) < -radius || Math.min(a[0], b[0]) > width + radius ||
-        Math.max(a[1], b[1]) < -radius || Math.min(a[1], b[1]) > height + radius) continue;
-    const ratio = rows[i].thickness_pred / rows[i].nominal_mm;
-    for (const [weight, shift, light] of [[2.1, 0, .36], [1.85, -.09, .67], [1.39, -.22, .93],
-      [.77, -.37, 1.12], [.21, -.55, 1.28]]) {
-      context.lineWidth = radius * weight;
-      context.strokeStyle = colour(ratio, light);
-      context.beginPath();
-      context.moveTo(a[0], a[1] + radius * shift);
-      context.lineTo(b[0], b[1] + radius * shift);
-      context.stroke();
-    }
+  const radius = clamp(Math.min(width, height) * .038, 7, 20);
+  context.lineJoin = "round";
+  context.lineWidth = .65;
+  for (const {vertices, fill} of meshFaces(project, heightScale, radius / baseScale)) {
+    if (vertices.every(v => v[0] < 0) || vertices.every(v => v[0] > width) ||
+        vertices.every(v => v[1] < 0) || vertices.every(v => v[1] > height)) continue;
+    context.beginPath();
+    context.moveTo(vertices[0][0], vertices[0][1]);
+    for (const [x, y] of vertices.slice(1)) context.lineTo(x, y);
+    context.closePath();
+    context.fillStyle = fill;
+    context.strokeStyle = fill;
+    context.fill();
+    context.stroke();
   }
   const occupied = new Set();
   const pointMarker = (point, size, color, fill) => {
@@ -378,7 +454,7 @@ function drawScene() {
   }
   const selected = screenPoints[chosen[activeCase]];
   if (selected) {
-    pointMarker(selected, radius + 4, "#f7fff9");
+    pointMarker(selected, radius * view.zoom + 4, "#f7fff9");
     pointMarker(selected, 4, "#f7fff9", "#15302e");
   }
 
@@ -480,22 +556,56 @@ function renderProfile() {
   svgElement(chart, "circle", {cx: px, cy: y(selected.thickness_pred), r: 4.5, fill: "#fff", stroke: "#143f34"});
 }
 
-function renderQuality() {
+function renderScores(warm, closed, open) {
+  const charts = byId("score-charts");
+  charts.replaceChildren();
+  for (const [key, title, direction] of [
+    ["pearson_squared", "Pearson²", "выше — лучше"], ["mae_mm", "MAE, мм", "ниже — лучше"]
+  ]) {
+    const group = document.createElement("div");
+    group.className = "score-metric";
+    const heading = document.createElement("h4");
+    const hint = document.createElement("span");
+    hint.textContent = direction;
+    heading.append(title + " · ", hint);
+    group.append(heading);
+    const max = key === "pearson_squared" ? 1 : Math.ceil(Math.max(1, closed?.[key] ?? 0, open?.[key] ?? 0));
+    for (const [style, label, metrics] of [
+      ["closed", "Закрытая", closed], ["open", "Открытая", open]
+    ]) {
+      const value = metrics?.[key];
+      const row = document.createElement("div");
+      row.className = "score-row " + style;
+      const tag = document.createElement("span");
+      tag.textContent = label;
+      const track = document.createElement("div");
+      track.className = "score-track";
+      track.setAttribute("aria-hidden", "true");
+      const bar = document.createElement("i");
+      bar.style.width = (Number.isFinite(value) ? 100 * clamp(value / max, 0, 1) : 0) + "%";
+      track.append(bar);
+      const output = document.createElement("output");
+      output.textContent = fmt(value, 3);
+      row.append(tag, track, output);
+      group.append(row);
+    }
+    const axis = document.createElement("div");
+    axis.className = "score-axis";
+    axis.setAttribute("aria-hidden", "true");
+    for (const value of [0, max]) {
+      const tick = document.createElement("span");
+      tick.textContent = fmt(value);
+      axis.append(tick);
+    }
+    group.append(axis);
+    charts.append(group);
+  }
+  setText("closed-note", closed ? "Закрытая — оценка организаторов для файла сдачи." : "Закрытая оценка для этого файла отсутствует.");
+  setText("open-note", warm ? "Открытая — поздние ВТД соседних участков." : "Открытая — среднее по кампаниям и магистралям.");
+}
+
+function renderScatter(rows, warm) {
   if (scatter.clientWidth < 80) return;
-  const warm = activeCase === "case1";
-  const split = warm ? "late_2023" : "holdout_main";
-  const rows = data.observations.filter(row => row.case === activeCase && row.split === split);
-  const closed = data.summary.closed_validation?.[activeCase];
-  const open = warm
-    ? data.metrics.find(row => row.case === activeCase && row.model === "direct_blend" && row.split === split)
-    : data.summary.case2_macro_validation.find(row => row.model === "xgboost_knn" && row.seed === data.summary.seed);
-  setText("closed-pearson", fmt(closed?.pearson_squared, 3));
-  setText("closed-mae", fmt(closed?.mae_mm, 3));
-  setText("closed-note", closed ? "Оценка организаторов, сообщённая командой для этого result.csv." : "Для этого файла оценка не зарегистрирована.");
-  setText("open-pearson", fmt(open?.pearson_squared, 3));
-  setText("open-mae", fmt(open?.mae_mm, 3));
-  setText("open-note", warm ? "Поздние ВТД соседних участков." : "Сначала среднее по кампаниям, затем по магистралям.");
-  setText("scatter-meta", fmt(rows.length) + " меток · " + (warm ? "поздние ВТД" : "MAIN-2 и MAIN-3 по очереди вне обучения"));
   if (!rows.length) {
     scatter.replaceChildren();
     return;
@@ -511,6 +621,21 @@ function renderQuality() {
     svgElement(scatter, "circle", {cx: x(row.y_mm), cy: y(row.thickness_pred), r: warm ? 3.7 : 2.7,
       fill: "#73dfc5", opacity: warm ? .77 : .25});
   }
+}
+
+function renderQuality() {
+  const warm = activeCase === "case1";
+  const split = warm ? "late_2023" : "holdout_main";
+  const observations = data.observations.filter(row => row.case === activeCase && row.split === split);
+  const closed = data.summary.closed_validation?.[activeCase];
+  const open = warm
+    ? data.metrics.find(row => row.case === activeCase && row.model === "direct_blend" && row.split === split)
+    : data.summary.case2_macro_validation.find(row => row.model === "xgboost_knn" && row.seed === data.summary.seed);
+  setText("forecast-model", "Итоговая модель · " + forecastModels[activeCase]);
+  setText("scatter-meta", fmt(observations.length) + " меток · " +
+    (warm ? "поздние ВТД" : "MAIN-2 и MAIN-3 по очереди вне обучения"));
+  renderScores(warm, closed, open);
+  renderScatter(observations, warm);
 }
 
 function selectSegment(index) {
@@ -536,6 +661,11 @@ function selectSegment(index) {
 function switchCase(next) {
   activeCase = next;
   rows = data.profiles.filter(item => item.case === next).sort((a, b) => a.segment_id - b.segment_id);
+  const thicknesses = rows.map(row => row.thickness_pred);
+  minThickness = Math.min(...thicknesses);
+  maxThickness = Math.max(...thicknesses);
+  setText("thickness-min", fmt(minThickness, 2));
+  setText("thickness-max", fmt(maxThickness, 2));
   route = data.routes[rows[0].id] ?? [];
   bounds = routeBounds(route);
   screenPoints = [];
@@ -544,16 +674,20 @@ function switchCase(next) {
   priority.replaceChildren(new Option("Выбрать · " + fmt(priorityRows.length) + " сегм.", ""));
   for (const row of priorityRows) priority.add(new Option(
     "№" + row.rank + " · сегм. " + row.segment_id + " · " + mm(row.thickness_pred), row.segment_id));
-  setText("ranking-model", predictions[next] + " формирует список приоритетов.");
+  setText("ranking-model", rankingModels[next] + " формирует список приоритетов.");
   const date = rows[0].target_date.slice(0, 10).split("-").reverse().join(".");
   setText("route-meta", rows[0].id + " / " + date + " / " + fmt(rows[rows.length - 1].end_m / 1000, 2) + " км");
   setText("route-coverage", bounds && bounds.count < rows.length ? fmt(bounds.count) + " из " + fmt(rows.length) + " сегм. с координатами" : "");
   byId("segment").max = rows.length - 1;
   byId("anchor-key").hidden = !rows.some(row => row.anchor_observed);
-  for (const button of document.querySelectorAll("[data-case]")) {
-    button.setAttribute("aria-pressed", String(button.dataset.case === next));
+  for (const button of caseTabs) {
+    const selected = button.dataset.case === next;
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
   }
+  byId("case-panel").setAttribute("aria-labelledby", "tab-" + next);
   Object.assign(view, initialView);
+  if (next === "case2") view.yaw -= .26;
   selectSegment(chosen[next] ?? priorityRows[0]?.segment_id ?? 0);
   renderQuality();
 }
@@ -573,6 +707,7 @@ byId("zoom-in").addEventListener("click", () => zoom(1.23));
 byId("zoom-out").addEventListener("click", () => zoom(1 / 1.23));
 byId("reset-view").addEventListener("click", () => {
   Object.assign(view, initialView);
+  if (activeCase === "case2") view.yaw -= .26;
   redrawScene();
 });
 canvas.addEventListener("keydown", event => {
@@ -585,7 +720,7 @@ canvas.addEventListener("keydown", event => {
   if (key === "ArrowDown") view.pitch = clamp(view.pitch - .1, -.95, 1.4);
   if (key === "+" || key === "=") zoom(1.23);
   if (key === "-") zoom(1 / 1.23);
-  if (key === "Home") Object.assign(view, initialView);
+  if (key === "Home") byId("reset-view").click();
   redrawScene();
 });
 canvas.addEventListener("wheel", event => {
@@ -637,8 +772,16 @@ chart.addEventListener("click", event => {
     Math.abs(row.center_m - position) < Math.abs(best.center_m - position) ? row : best);
   selectSegment(nearest.segment_id);
 });
-for (const button of document.querySelectorAll("[data-case]")) {
+for (const [index, button] of caseTabs.entries()) {
   button.addEventListener("click", () => switchCase(button.dataset.case));
+  button.addEventListener("keydown", event => {
+    const target = {ArrowLeft: (index - 1 + caseTabs.length) % caseTabs.length,
+      ArrowRight: (index + 1) % caseTabs.length, Home: 0, End: caseTabs.length - 1}[event.key];
+    if (target === undefined) return;
+    event.preventDefault();
+    caseTabs[target].focus();
+    switchCase(caseTabs[target].dataset.case);
+  });
 }
 for (const button of document.querySelectorAll("[data-file]")) {
   button.addEventListener("click", () => {
