@@ -6,7 +6,7 @@ const canvas = byId("scene");
 const context = canvas.getContext("2d");
 const chart = byId("section-chart");
 const scatter = byId("scatter-chart");
-const initialView = {yaw: -.43, pitch: .58, zoom: 1};
+const initialView = {yaw: -.43, pitch: .58, zoom: 1, target: null, offsetX: 0, offsetY: 0, follow: false};
 const view = {...initialView};
 const chosen = {case1: null, case2: null};
 const formatter = (digits = 0) => new Intl.NumberFormat("ru-RU", {
@@ -27,10 +27,16 @@ const forecastModels = {
   case2: "XGBoost + KNN"
 };
 const caseTabs = Array.from(document.querySelectorAll("[data-case]"));
-const ringAngles = Array.from({length: 12}, (_, i) => i * 2 * Math.PI / 12);
+const ringOffsets = Array.from({length: 10}, (_, i) => {
+  const angle = i * 2 * Math.PI / 10;
+  return [Math.cos(angle), Math.sin(angle)];
+});
+const lighting = [.58, .66, .74, .82, .90, .98, 1.06, 1.14];
 let activeCase = "case1";
 let rows, route, bounds, priorityRows, domain, minThickness, maxThickness;
 let screenPoints = [];
+let mesh;
+let hitRadius = 24;
 let frame = 0;
 
 function colour(thickness, light = 1) {
@@ -51,7 +57,7 @@ function routeBounds(points) {
   return {min, max, mid: min.map((value, i) => (value + max[i]) / 2), count: usable.length};
 }
 
-function meshFaces(project, heightScale, radius) {
+function prepareMesh(heightScale) {
   const points = route.map(point => point && [point[0], point[1], point[2] * heightScale]);
   const ringAt = index => {
     const a = points[index - 1], b = points[index];
@@ -64,45 +70,75 @@ function meshFaces(project, heightScale, radius) {
     const incline = Math.atan2(dy, hypot(dx, dz));
     const sh = Math.sin(heading), ch = Math.cos(heading);
     const si = Math.sin(incline), ci = Math.cos(incline);
-    const [east, north, altitude] = centre;
-    const origin = project(east, north, altitude / heightScale);
-    const vertices = ringAngles.map(angle => {
-      const lateral = Math.cos(angle) * radius, vertical = Math.sin(angle) * radius;
-      return project(east - lateral * sh - vertical * si * ch,
-        north + lateral * ch - vertical * si * sh, (altitude + vertical * ci) / heightScale);
-    });
-    return {origin, vertices};
+    const offsets = ringOffsets.map(([lateral, vertical]) =>
+      [-lateral * sh - vertical * si * ch, lateral * ch - vertical * si * sh, vertical * ci]);
+    return {centre, offsets};
   };
   const rings = Array.from({length: points.length + 1}, (_, i) => ringAt(i));
-  const faces = [];
-  const addFace = (vertices, fill) => {
-    const depth = vertices.reduce((sum, vertex) => sum + vertex[2], 0) / vertices.length;
-    faces.push({vertices, fill, depth});
-  };
-  const inset = (vertex, origin) => origin.map((v, i) => v + .66 * (vertex[i] - v));
-  points.forEach((point, index) => {
-    if (!point) return;
-    const start = rings[index], end = rings[index + 1];
-    const first = !points[index - 1], last = !points[index + 1];
-    const thickness = rows[index].thickness_pred;
-    for (let i = 0; i < ringAngles.length; i++) {
-      const j = (i + 1) % ringAngles.length;
-      const a = start.vertices[i], b = start.vertices[j], c = end.vertices[j], d = end.vertices[i];
-      const facing = (a[2] + b[2] + c[2] + d[2] - 2 * (start.origin[2] + end.origin[2])) / (4 * radius);
-      if (facing > -.02) {
-        const upward = (start.origin[1] - (a[1] + b[1]) / 2) + (end.origin[1] - (c[1] + d[1]) / 2);
-        const light = .60 + .25 * Math.max(0, facing) + .36 * (clamp(upward / 24, -1, 1) + 1) / 2;
-        addFace([a, b, c, d], colour(thickness, light));
-      }
-      if (first && start.origin[2] >= end.origin[2]) {
-        addFace([a, b, inset(b, start.origin), inset(a, start.origin)], colour(thickness, .9));
-      }
-      if (last && end.origin[2] >= start.origin[2]) {
-        addFace([c, d, inset(d, end.origin), inset(c, end.origin)], colour(thickness, .9));
-      }
+  const palette = rows.map(row => lighting.map(light => colour(row.thickness_pred, light)));
+  return {heightScale, points, rings, palette};
+}
+
+function drawTube(project, heightScale, radius, radiusPx, width, height, stride) {
+  if (mesh?.heightScale !== heightScale) mesh = prepareMesh(heightScale);
+  const {points, rings, palette} = mesh;
+  const spans = [];
+  const projected = new Map();
+  let start = 0;
+  while (start < points.length) {
+    if (!points[start]) {
+      start++;
+      continue;
     }
-  });
-  return faces.sort((a, b) => a.depth - b.depth);
+    let end = start + 1;
+    while (end < start + stride && points[end]) end++;
+    const centreA = project(...rings[start].centre), centreB = project(...rings[end].centre);
+    if (!(Math.max(centreA[0], centreB[0]) < -radiusPx || Math.min(centreA[0], centreB[0]) > width + radiusPx ||
+        Math.max(centreA[1], centreB[1]) < -radiusPx || Math.min(centreA[1], centreB[1]) > height + radiusPx)) {
+      spans.push({start, end, centreA, centreB, depth: centreA[2] + centreB[2]});
+    }
+    start = end;
+  }
+  const vertices = index => {
+    if (!projected.has(index)) {
+      const {centre, offsets} = rings[index];
+      projected.set(index, offsets.map(([x, z, y]) =>
+        project(centre[0] + x * radius, centre[1] + z * radius, centre[2] + y * radius)));
+    }
+    return projected.get(index);
+  };
+  const quad = (a, b, c, d, fill) => {
+    context.beginPath();
+    context.moveTo(a[0], a[1]);
+    context.lineTo(b[0], b[1]);
+    context.lineTo(c[0], c[1]);
+    context.lineTo(d[0], d[1]);
+    context.closePath();
+    context.fillStyle = fill;
+    context.strokeStyle = fill;
+    context.fill();
+    context.stroke();
+  };
+  const inset = (p, o) => [o[0] + .66 * (p[0] - o[0]), o[1] + .66 * (p[1] - o[1])];
+  spans.sort((a, b) => a.depth - b.depth);
+  context.lineWidth = .65;
+  for (const {start, end, centreA, centreB, depth} of spans) {
+    const a = vertices(start), b = vertices(end);
+    const colours = palette[Math.floor((start + end - 1) / 2)];
+    const frontCap = !points[start - 1] && centreA[2] >= centreB[2];
+    const rearCap = !points[end] && centreB[2] >= centreA[2];
+    for (let i = 0; i < a.length; i++) {
+      const j = (i + 1) % a.length;
+      const facing = (a[i][2] + a[j][2] + b[i][2] + b[j][2] - 2 * depth) / (4 * radius);
+      if (facing > -.02) {
+        const upward = (centreA[1] + centreB[1] - (a[i][1] + a[j][1] + b[i][1] + b[j][1]) / 2) / (2 * radiusPx);
+        const shade = clamp(Math.round(3 + 2.1 * facing + 2.5 * upward), 0, lighting.length - 1);
+        quad(a[i], a[j], b[j], b[i], colours[shade]);
+      }
+      if (frontCap) quad(a[i], a[j], inset(a[j], centreA), inset(a[i], centreA), colours[4]);
+      if (rearCap) quad(b[j], b[i], inset(b[i], centreB), inset(b[j], centreB), colours[4]);
+    }
+  }
 }
 
 function drawScene() {
@@ -111,8 +147,9 @@ function drawScene() {
   const width = canvas.clientWidth, height = canvas.clientHeight;
   if (width < 1 || height < 1) return;
   const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.round(width * pixelRatio);
-  canvas.height = Math.round(height * pixelRatio);
+  const bufferWidth = Math.round(width * pixelRatio), bufferHeight = Math.round(height * pixelRatio);
+  if (canvas.width !== bufferWidth) canvas.width = bufferWidth;
+  if (canvas.height !== bufferHeight) canvas.height = bufferHeight;
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.clearRect(0, 0, width, height);
   if (!bounds) {
@@ -124,7 +161,7 @@ function drawScene() {
   }
 
   const heightScale = Number(byId("height-scale").value);
-  const [east, north, elevation] = bounds.mid;
+  const [east, north, elevation] = route[view.target] ?? bounds.mid;
   const span = Math.max(1, hypot(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1],
     (bounds.max[2] - bounds.min[2]) * heightScale));
   const baseScale = Math.min(width * .84, height * 1.59) / span;
@@ -132,14 +169,15 @@ function drawScene() {
   const sy = Math.sin(view.yaw), cy = Math.cos(view.yaw);
   const sp = Math.sin(view.pitch), cp = Math.cos(view.pitch);
   function project(x, z, h) {
-    const dx = x - east, dz = z - north, dy = (h - elevation) * heightScale;
+    const dx = x - east, dz = z - north, dy = h - elevation * heightScale;
     const forward = dx * sy + dz * cy;
     const depth = forward * cp + dy * sp;
-    return [width / 2 + scale * (dx * cy - dz * sy), height * .49 - scale * (dy * cp - forward * sp), depth];
+    return [width / 2 + view.offsetX + scale * (dx * cy - dz * sy),
+      height * .49 + view.offsetY - scale * (dy * cp - forward * sp), depth];
   }
 
-  const gridY = bounds.min[2] - span * .055 / heightScale;
-  const gridSpan = span * .57;
+  const gridSpan = span * .57 / view.zoom;
+  const gridY = (view.target === null ? bounds.min[2] : elevation) * heightScale - gridSpan * .097;
   context.lineWidth = 1;
   context.strokeStyle = "#294651";
   context.beginPath();
@@ -155,22 +193,13 @@ function drawScene() {
   }
   context.stroke();
 
-  screenPoints = route.map(point => point && project(...point));
-  const radius = clamp(Math.min(width, height) * .038, 7, 20);
+  screenPoints = route.map(point => point && project(point[0], point[1], point[2] * heightScale));
+  const radiusPx = clamp(Math.min(width, height) * .038 * Math.sqrt(view.zoom), 7, 26);
+  hitRadius = radiusPx + 8;
   context.lineJoin = "round";
-  context.lineWidth = .65;
-  for (const {vertices, fill} of meshFaces(project, heightScale, radius / baseScale)) {
-    if (vertices.every(v => v[0] < 0) || vertices.every(v => v[0] > width) ||
-        vertices.every(v => v[1] < 0) || vertices.every(v => v[1] > height)) continue;
-    context.beginPath();
-    context.moveTo(vertices[0][0], vertices[0][1]);
-    for (const [x, y] of vertices.slice(1)) context.lineTo(x, y);
-    context.closePath();
-    context.fillStyle = fill;
-    context.strokeStyle = fill;
-    context.fill();
-    context.stroke();
-  }
+  // At overview scale multiple cells share a pixel. Restore one span per cell as the route fills the view.
+  const stride = 2 ** Math.max(0, Math.ceil(Math.log2(3 * rows.length / (baseScale * span * view.zoom))));
+  drawTube(project, heightScale, radiusPx / scale, radiusPx, width, height, stride);
   const occupied = new Set();
   const pointMarker = (point, size, color, fill) => {
     context.beginPath();
@@ -185,7 +214,7 @@ function drawScene() {
   };
   for (const row of priorityRows) {
     const point = screenPoints[row.segment_id];
-    if (!point) continue;
+    if (!point || point[0] < 0 || point[0] > width || point[1] < 0 || point[1] > height) continue;
     const bucket = Math.round(point[0] / 13) + "/" + Math.round(point[1] / 13);
     if (occupied.has(bucket)) continue;
     occupied.add(bucket);
@@ -193,7 +222,7 @@ function drawScene() {
   }
   const selected = screenPoints[chosen[activeCase]];
   if (selected) {
-    pointMarker(selected, radius * view.zoom + 4, "#f7fff9");
+    pointMarker(selected, radiusPx + 4, "#f7fff9");
     pointMarker(selected, 4, "#f7fff9", "#15302e");
   }
 
@@ -382,6 +411,8 @@ function selectSegment(index) {
   index = clamp(Math.round(index), 0, rows.length - 1);
   chosen[activeCase] = index;
   const row = rows[index];
+  byId("focus-segment").disabled = !route[index];
+  if (view.follow && route[index]) view.target = index;
   byId("segment").value = index;
   byId("priority").value = row.rank === null ? "" : String(index);
   byId("prediction").replaceChildren(document.createTextNode(fmt(row.thickness_pred, 2) + " "));
@@ -407,6 +438,7 @@ function switchCase(next) {
   setText("thickness-max", fmt(maxThickness, 2));
   route = data.routes[rows[0].id] ?? [];
   bounds = routeBounds(route);
+  mesh = null;
   screenPoints = [];
   priorityRows = rows.filter(row => row.rank !== null).sort((a, b) => a.rank - b.rank);
   const priority = byId("priority");
@@ -431,12 +463,57 @@ function switchCase(next) {
   renderQuality();
 }
 
-function zoom(factor) {
-  view.zoom = clamp(view.zoom * factor, .45, 5);
+function nearestSegment(x, y) {
+  let best = hitRadius ** 2, nearest = null;
+  screenPoints.forEach((point, i) => {
+    if (!point) return;
+    const distance = (point[0] - x) ** 2 + (point[1] - y) ** 2;
+    if (distance < best) {
+      nearest = i;
+      best = distance;
+    }
+  });
+  return nearest;
+}
+
+function canvasPosition(event) {
+  const rect = canvas.getBoundingClientRect();
+  return [event.clientX - rect.left, event.clientY - rect.top];
+}
+
+function zoom(factor, position) {
+  const next = clamp(view.zoom * factor, .45, 640);
+  if (position && next !== view.zoom) {
+    const [x, y] = position;
+    const index = frame ? null : nearestSegment(x, y);
+    const cx = canvas.clientWidth / 2, cy = canvas.clientHeight * .49;
+    const point = index === null ? [cx + view.offsetX, cy + view.offsetY] : screenPoints[index];
+    const ratio = next / view.zoom;
+    view.offsetX = x - cx + (point[0] - x) * ratio;
+    view.offsetY = y - cy + (point[1] - y) * ratio;
+    if (index !== null) view.target = index;
+    view.follow = false;
+  }
+  view.zoom = next;
   redrawScene();
 }
 
+function focusSegment(index = chosen[activeCase]) {
+  if (!route[index]) return;
+  const routeLength = rows[rows.length - 1].end_m;
+  Object.assign(view, {target: index, offsetX: 0, offsetY: 0, follow: true,
+    zoom: Math.max(1, routeLength / 140)});
+  selectSegment(index);
+}
+
+function stepSegment(delta) {
+  selectSegment(chosen[activeCase] + delta);
+}
+
 byId("height-scale").addEventListener("change", redrawScene);
+byId("focus-segment").addEventListener("click", () => focusSegment());
+byId("prev-segment").addEventListener("click", () => stepSegment(-1));
+byId("next-segment").addEventListener("click", () => stepSegment(1));
 byId("profile-window").addEventListener("change", renderProfile);
 byId("segment").addEventListener("change", event => selectSegment(event.target.valueAsNumber));
 byId("priority").addEventListener("change", event => {
@@ -463,44 +540,53 @@ canvas.addEventListener("keydown", event => {
   redrawScene();
 });
 canvas.addEventListener("wheel", event => {
-  if (document.activeElement !== canvas) return;
   event.preventDefault();
-  zoom(event.deltaY < 0 ? 1.13 : 1 / 1.13);
+  const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 200 : 1);
+  zoom(Math.exp(clamp(-delta * .0025, -.5, .5)), canvasPosition(event));
 }, {passive: false});
-let drag;
+canvas.addEventListener("dblclick", event => {
+  const index = nearestSegment(...canvasPosition(event));
+  if (index !== null) focusSegment(index);
+});
+const pointers = new Map();
+let moved = false;
 canvas.addEventListener("pointerdown", event => {
-  if (!event.isPrimary || event.button !== 0) return;
-  drag = {x: event.clientX, y: event.clientY, moved: false, pointerId: event.pointerId};
+  if (event.button !== 0 || pointers.size >= 2) return;
+  moved = pointers.size > 0;
+  pointers.set(event.pointerId, canvasPosition(event));
   canvas.setPointerCapture(event.pointerId);
 });
 canvas.addEventListener("pointermove", event => {
-  if (drag?.pointerId !== event.pointerId) return;
-  const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
-  if (!drag.moved && hypot(dx, dy) < 4) return;
-  Object.assign(drag, {x: event.clientX, y: event.clientY, moved: true});
-  view.yaw += dx * .009;
-  view.pitch = clamp(view.pitch + dy * .009, -.95, 1.4);
+  const before = pointers.get(event.pointerId);
+  if (!before) return;
+  const current = canvasPosition(event);
+  const dx = current[0] - before[0], dy = current[1] - before[1];
+  if (!moved && hypot(dx, dy) < 4) return;
+  moved = true;
+  pointers.set(event.pointerId, current);
+  if (pointers.size === 2) {
+    const other = [...pointers.entries()].find(([id]) => id !== event.pointerId)[1];
+    const previousDistance = hypot(before[0] - other[0], before[1] - other[1]);
+    if (previousDistance < 1) return;
+    const distance = hypot(current[0] - other[0], current[1] - other[1]);
+    zoom(distance / previousDistance, [(before[0] + other[0]) / 2, (before[1] + other[1]) / 2]);
+    view.offsetX += dx / 2;
+    view.offsetY += dy / 2;
+  } else if (event.shiftKey) {
+    view.offsetX += dx;
+    view.offsetY += dy;
+  } else {
+    view.yaw += dx * .009;
+    view.pitch = clamp(view.pitch + dy * .009, -.95, 1.4);
+  }
   redrawScene();
 });
 canvas.addEventListener("pointerup", event => {
-  if (drag?.pointerId !== event.pointerId) return;
-  const moved = drag.moved;
-  drag = null;
-  if (moved) return;
-  const rect = canvas.getBoundingClientRect();
-  const x = event.clientX - rect.left, y = event.clientY - rect.top;
-  let nearest = null, best = 24;
-  screenPoints.forEach((point, i) => {
-    if (!point) return;
-    const d = hypot(point[0] - x, point[1] - y);
-    if (d < best) {
-      nearest = i;
-      best = d;
-    }
-  });
+  if (!pointers.delete(event.pointerId) || moved) return;
+  const nearest = nearestSegment(...canvasPosition(event));
   if (nearest !== null) selectSegment(nearest);
 });
-canvas.addEventListener("lostpointercapture", () => { drag = null; });
+canvas.addEventListener("lostpointercapture", event => pointers.delete(event.pointerId));
 chart.addEventListener("click", event => {
   if (!domain) return;
   const rect = chart.getBoundingClientRect();

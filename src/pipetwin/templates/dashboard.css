@@ -92,6 +92,9 @@ main { padding-bottom: 36px; }
 .detail input { width: 78px; }
 .detail .value { color: var(--teal); font-size: clamp(2.25rem, 3.6vw, 3.8rem); line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.055em; }
 .value small { font-size: .35em; color: var(--muted); letter-spacing: 0; }
+.segment-controls { display: grid; grid-template-columns: auto 1fr auto; gap: 5px; margin-top: 12px; }
+.segment-controls button { padding: .42rem .55rem; font-size: .84rem; }
+.segment-controls button:disabled { opacity: .55; cursor: default; }
 dl { margin: 16px 0 20px; font-variant-numeric: tabular-nums; }
 .detail dl > div { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--border); padding: .63rem 0; }
 dt { color: var(--muted); font-size: .83rem; }

@@ -32,7 +32,7 @@
           <div><div id="route-meta" class="eyebrow"></div><h2 id="route-title">Труба в 3D</h2></div>
           <label class="scale">Рельеф
             <select id="height-scale" aria-label="Масштаб высоты">
-              <option value="1">×1</option><option value="4">×4</option><option value="8" selected>×8</option><option value="16">×16</option>
+              <option value="1" selected>×1</option><option value="4">×4</option><option value="8">×8</option><option value="16">×16</option>
             </select>
           </label>
         </header>
@@ -50,7 +50,8 @@
             <span>Прогноз, мм</span><span id="thickness-min"></span><span class="ramp" aria-hidden="true"></span><span id="thickness-max"></span>
             <span class="marker-legend">Приоритет обследования</span>
           </div>
-          <p class="note">Коралловый — тоньше, бирюзовый — толще. Перетащите трубу для вращения. Диаметр увеличен для читаемости.</p>
+          <p class="note">Перетаскивание вращает трубу, колесо и жест двумя пальцами приближают. Двойной щелчок открывает сегмент крупным планом.</p>
+          <p class="note">Ось трассы взята из съёмки. Диаметр увеличен. Коралловый — тоньше, бирюзовый — толще.</p>
         </div>
       </div>
       <aside class="panel detail" aria-labelledby="segment-title">
@@ -60,6 +61,11 @@
         </div>
         <div class="value" id="prediction"></div>
         <p id="segment-band" class="muted"></p>
+        <div class="segment-controls">
+          <button type="button" id="prev-segment" aria-label="Предыдущий сегмент">←</button>
+          <button type="button" id="focus-segment">К сегменту</button>
+          <button type="button" id="next-segment" aria-label="Следующий сегмент">→</button>
+        </div>
         <dl>
           <div><dt>От номинала</dt><dd id="fraction"></dd></div>
           <div><dt>Номинал</dt><dd id="nominal"></dd></div>
