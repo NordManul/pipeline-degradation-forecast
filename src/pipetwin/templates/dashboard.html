@@ -27,7 +27,7 @@
     </div>
     <div id="case-panel" role="tabpanel" aria-labelledby="tab-case1">
     <section class="workspace" aria-labelledby="route-title">
-      <div class="panel route">
+      <div class="panel route" id="route-panel">
         <header class="panel-head">
           <div><div id="route-meta" class="eyebrow"></div><h2 id="route-title">Труба в 3D</h2></div>
           <label class="scale">Рельеф
@@ -39,11 +39,19 @@
         <div class="viewport">
           <canvas id="scene" tabindex="0" aria-label="Трёхмерная трасса. Стрелки вращают, плюс и минус меняют масштаб, Home сбрасывает вид."></canvas>
           <div class="view-controls" aria-label="Управление видом">
+            <button type="button" id="fullscreen-view" aria-label="Полноэкранный режим" aria-pressed="false" title="Развернуть 3D-вид">
+              <svg class="expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-6 6M10 19H5v-5M5 19l6-6"/></svg>
+              <svg class="collapse-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5v5h5M14 10l6-6M5 14h5v5M10 14l-6 6"/></svg>
+            </button>
             <button type="button" id="zoom-in" aria-label="Приблизить">+</button>
             <button type="button" id="zoom-out" aria-label="Отдалить">−</button>
             <button type="button" id="reset-view" aria-label="Сбросить вид" title="Сбросить вид">↺</button>
           </div>
           <span id="route-coverage" class="route-coverage"></span>
+          <div class="map-scale" id="map-scale" aria-label="Горизонтальный масштаб" hidden>
+            <span id="grid-step"></span>
+            <span class="scale-ruler" id="scale-ruler"></span>
+          </div>
         </div>
         <div class="route-footer">
           <div class="legend">

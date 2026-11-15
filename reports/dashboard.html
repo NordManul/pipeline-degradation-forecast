@@ -84,8 +84,41 @@ main { padding-bottom: 36px; }
 #scene:focus-visible { outline-offset: -3px; }
 .view-controls { position: absolute; top: 12px; right: 12px; display: grid; gap: 6px; }
 .view-controls button { width: 36px; height: 36px; padding: 0; font-size: 1.15rem; }
-.route-coverage { position: absolute; bottom: 12px; left: 12px; color: var(--gold); font-size: .72rem; pointer-events: none; }
+.view-controls svg { width: 18px; height: 18px; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#fullscreen-view .collapse-icon, #fullscreen-view[aria-pressed="true"] .expand-icon { display: none; }
+#fullscreen-view[aria-pressed="true"] .collapse-icon { display: inline-block; }
+.route-coverage { position: absolute; top: 12px; left: 12px; color: var(--gold); font-size: .72rem; pointer-events: none; }
 .route-coverage:empty { display: none; }
+.map-scale {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #091319e8;
+  color: #c7d9db;
+  font-size: .72rem;
+  line-height: 1.25;
+  pointer-events: none;
+}
+.scale-ruler { display: grid; place-items: end center; min-height: 15px; border: 1px solid #c7d9db; border-top: 0; font-variant-numeric: tabular-nums; }
+.route.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-radius: 0;
+}
+.route.expanded #scene { height: 100%; }
+.route.expanded .route-footer .note { display: none; }
+body.expanded-route { overflow: hidden; }
 .route-footer { padding: 14px 22px; }
 .legend, .chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: .78rem; color: var(--muted); }
 .ramp { width: clamp(44px, 11vw, 135px); height: 7px; border-radius: 999px; background: linear-gradient(90deg, #e78766, #dbbe72, #5bd6b4); }
@@ -177,7 +210,7 @@ dd { margin: 0; font-weight: 650; }
     </div>
     <div id="case-panel" role="tabpanel" aria-labelledby="tab-case1">
     <section class="workspace" aria-labelledby="route-title">
-      <div class="panel route">
+      <div class="panel route" id="route-panel">
         <header class="panel-head">
           <div><div id="route-meta" class="eyebrow"></div><h2 id="route-title">Труба в 3D</h2></div>
           <label class="scale">Рельеф
@@ -189,11 +222,19 @@ dd { margin: 0; font-weight: 650; }
         <div class="viewport">
           <canvas id="scene" tabindex="0" aria-label="Трёхмерная трасса. Стрелки вращают, плюс и минус меняют масштаб, Home сбрасывает вид."></canvas>
           <div class="view-controls" aria-label="Управление видом">
+            <button type="button" id="fullscreen-view" aria-label="Полноэкранный режим" aria-pressed="false" title="Развернуть 3D-вид">
+              <svg class="expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-6 6M10 19H5v-5M5 19l6-6"/></svg>
+              <svg class="collapse-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5v5h5M14 10l6-6M5 14h5v5M10 14l-6 6"/></svg>
+            </button>
             <button type="button" id="zoom-in" aria-label="Приблизить">+</button>
             <button type="button" id="zoom-out" aria-label="Отдалить">−</button>
             <button type="button" id="reset-view" aria-label="Сбросить вид" title="Сбросить вид">↺</button>
           </div>
           <span id="route-coverage" class="route-coverage"></span>
+          <div class="map-scale" id="map-scale" aria-label="Горизонтальный масштаб" hidden>
+            <span id="grid-step"></span>
+            <span class="scale-ruler" id="scale-ruler"></span>
+          </div>
         </div>
         <div class="route-footer">
           <div class="legend">
@@ -274,6 +315,11 @@ const byId = id => document.getElementById(id);
 const data = JSON.parse(byId("report-data").textContent);
 const canvas = byId("scene");
 const context = canvas.getContext("2d");
+const routePanel = byId("route-panel");
+const fullscreenButton = byId("fullscreen-view");
+const mapScale = byId("map-scale");
+const gridLabel = byId("grid-step");
+const scaleRuler = byId("scale-ruler");
 const chart = byId("section-chart");
 const scatter = byId("scatter-chart");
 const initialView = {yaw: -.43, pitch: .58, zoom: 1, target: null, offsetX: 0, offsetY: 0, follow: false};
@@ -325,6 +371,28 @@ function routeBounds(points) {
   const min = [0, 1, 2].map(i => Math.min(...usable.map(point => point[i])));
   const max = [0, 1, 2].map(i => Math.max(...usable.map(point => point[i])));
   return {min, max, mid: min.map((value, i) => (value + max[i]) / 2), count: usable.length};
+}
+
+function niceDistance(limit) {
+  const power = 10 ** Math.floor(Math.log10(limit));
+  const magnitude = limit / power;
+  return power * (magnitude >= 5 ? 5 : magnitude >= 2 ? 2 : 1);
+}
+
+function distanceLabel(metres) {
+  if (metres >= 1000) return fmt(metres / 1000, metres % 1000 ? 1 : 0) + " км";
+  return fmt(metres, metres < 1 ? 1 : 0) + " м";
+}
+
+function updateScale(step, pixelsPerMetre, width) {
+  const rulerMetres = niceDistance(Math.min(width * .32, 155) / pixelsPerMetre);
+  const stepText = "Шаг сетки · " + distanceLabel(step);
+  const rulerText = distanceLabel(rulerMetres);
+  const rulerWidth = (rulerMetres * pixelsPerMetre).toFixed(1) + "px";
+  if (gridLabel.textContent !== stepText) gridLabel.textContent = stepText;
+  if (scaleRuler.textContent !== rulerText) scaleRuler.textContent = rulerText;
+  if (scaleRuler.style.width !== rulerWidth) scaleRuler.style.width = rulerWidth;
+  mapScale.hidden = false;
 }
 
 function prepareMesh(heightScale) {
@@ -423,6 +491,7 @@ function drawScene() {
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.clearRect(0, 0, width, height);
   if (!bounds) {
+    mapScale.hidden = true;
     context.textAlign = "center";
     context.fillStyle = "#a9bdc0";
     context.font = "14px system-ui";
@@ -446,13 +515,16 @@ function drawScene() {
       height * .49 + view.offsetY - scale * (dy * cp - forward * sp), depth];
   }
 
-  const gridSpan = span * .57 / view.zoom;
+  const gridStep = niceDistance(span * .14 / view.zoom);
+  const gridLines = Math.ceil(span * .57 / view.zoom / gridStep);
+  const gridSpan = gridStep * gridLines;
+  updateScale(gridStep, scale, width);
   const gridY = (view.target === null ? bounds.min[2] : elevation) * heightScale - gridSpan * .097;
   context.lineWidth = 1;
   context.strokeStyle = "#294651";
   context.beginPath();
-  for (let index = -5; index <= 5; index++) {
-    const offset = gridSpan * index / 5;
+  for (let index = -gridLines; index <= gridLines; index++) {
+    const offset = gridStep * index;
     for (const [a, b] of [
       [project(east - gridSpan, north + offset, gridY), project(east + gridSpan, north + offset, gridY)],
       [project(east + offset, north - gridSpan, gridY), project(east + offset, north + gridSpan, gridY)]
@@ -521,6 +593,46 @@ function drawScene() {
 function redrawScene() {
   if (!frame) frame = requestAnimationFrame(drawScene);
 }
+
+let expandedInPage = false;
+let switchingFullscreen = false;
+function syncFullscreen() {
+  const expanded = expandedInPage || document.fullscreenElement === routePanel;
+  routePanel.classList.toggle("expanded", expanded);
+  document.body.classList.toggle("expanded-route", expanded);
+  fullscreenButton.setAttribute("aria-pressed", String(expanded));
+  fullscreenButton.title = expanded ? "Свернуть 3D-вид" : "Развернуть 3D-вид";
+  redrawScene();
+}
+
+fullscreenButton.addEventListener("click", async () => {
+  if (switchingFullscreen) return;
+  switchingFullscreen = true;
+  try {
+    if (document.fullscreenElement === routePanel) {
+      await document.exitFullscreen();
+    } else if (expandedInPage) {
+      expandedInPage = false;
+    } else {
+      try {
+        if (routePanel.requestFullscreen) await routePanel.requestFullscreen();
+        else expandedInPage = true;
+      } catch {
+        expandedInPage = true;
+      }
+    }
+  } finally {
+    switchingFullscreen = false;
+    syncFullscreen();
+  }
+});
+document.addEventListener("fullscreenchange", syncFullscreen);
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape" || !expandedInPage) return;
+  expandedInPage = false;
+  syncFullscreen();
+  fullscreenButton.focus();
+});
 
 function svgElement(svg, tag, attrs, label) {
   const element = document.createElementNS("http://www.w3.org/2000/svg", tag);

@@ -4,6 +4,11 @@ const byId = id => document.getElementById(id);
 const data = JSON.parse(byId("report-data").textContent);
 const canvas = byId("scene");
 const context = canvas.getContext("2d");
+const routePanel = byId("route-panel");
+const fullscreenButton = byId("fullscreen-view");
+const mapScale = byId("map-scale");
+const gridLabel = byId("grid-step");
+const scaleRuler = byId("scale-ruler");
 const chart = byId("section-chart");
 const scatter = byId("scatter-chart");
 const initialView = {yaw: -.43, pitch: .58, zoom: 1, target: null, offsetX: 0, offsetY: 0, follow: false};
@@ -55,6 +60,28 @@ function routeBounds(points) {
   const min = [0, 1, 2].map(i => Math.min(...usable.map(point => point[i])));
   const max = [0, 1, 2].map(i => Math.max(...usable.map(point => point[i])));
   return {min, max, mid: min.map((value, i) => (value + max[i]) / 2), count: usable.length};
+}
+
+function niceDistance(limit) {
+  const power = 10 ** Math.floor(Math.log10(limit));
+  const magnitude = limit / power;
+  return power * (magnitude >= 5 ? 5 : magnitude >= 2 ? 2 : 1);
+}
+
+function distanceLabel(metres) {
+  if (metres >= 1000) return fmt(metres / 1000, metres % 1000 ? 1 : 0) + " км";
+  return fmt(metres, metres < 1 ? 1 : 0) + " м";
+}
+
+function updateScale(step, pixelsPerMetre, width) {
+  const rulerMetres = niceDistance(Math.min(width * .32, 155) / pixelsPerMetre);
+  const stepText = "Шаг сетки · " + distanceLabel(step);
+  const rulerText = distanceLabel(rulerMetres);
+  const rulerWidth = (rulerMetres * pixelsPerMetre).toFixed(1) + "px";
+  if (gridLabel.textContent !== stepText) gridLabel.textContent = stepText;
+  if (scaleRuler.textContent !== rulerText) scaleRuler.textContent = rulerText;
+  if (scaleRuler.style.width !== rulerWidth) scaleRuler.style.width = rulerWidth;
+  mapScale.hidden = false;
 }
 
 function prepareMesh(heightScale) {
@@ -153,6 +180,7 @@ function drawScene() {
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.clearRect(0, 0, width, height);
   if (!bounds) {
+    mapScale.hidden = true;
     context.textAlign = "center";
     context.fillStyle = "#a9bdc0";
     context.font = "14px system-ui";
@@ -176,13 +204,16 @@ function drawScene() {
       height * .49 + view.offsetY - scale * (dy * cp - forward * sp), depth];
   }
 
-  const gridSpan = span * .57 / view.zoom;
+  const gridStep = niceDistance(span * .14 / view.zoom);
+  const gridLines = Math.ceil(span * .57 / view.zoom / gridStep);
+  const gridSpan = gridStep * gridLines;
+  updateScale(gridStep, scale, width);
   const gridY = (view.target === null ? bounds.min[2] : elevation) * heightScale - gridSpan * .097;
   context.lineWidth = 1;
   context.strokeStyle = "#294651";
   context.beginPath();
-  for (let index = -5; index <= 5; index++) {
-    const offset = gridSpan * index / 5;
+  for (let index = -gridLines; index <= gridLines; index++) {
+    const offset = gridStep * index;
     for (const [a, b] of [
       [project(east - gridSpan, north + offset, gridY), project(east + gridSpan, north + offset, gridY)],
       [project(east + offset, north - gridSpan, gridY), project(east + offset, north + gridSpan, gridY)]
@@ -251,6 +282,46 @@ function drawScene() {
 function redrawScene() {
   if (!frame) frame = requestAnimationFrame(drawScene);
 }
+
+let expandedInPage = false;
+let switchingFullscreen = false;
+function syncFullscreen() {
+  const expanded = expandedInPage || document.fullscreenElement === routePanel;
+  routePanel.classList.toggle("expanded", expanded);
+  document.body.classList.toggle("expanded-route", expanded);
+  fullscreenButton.setAttribute("aria-pressed", String(expanded));
+  fullscreenButton.title = expanded ? "Свернуть 3D-вид" : "Развернуть 3D-вид";
+  redrawScene();
+}
+
+fullscreenButton.addEventListener("click", async () => {
+  if (switchingFullscreen) return;
+  switchingFullscreen = true;
+  try {
+    if (document.fullscreenElement === routePanel) {
+      await document.exitFullscreen();
+    } else if (expandedInPage) {
+      expandedInPage = false;
+    } else {
+      try {
+        if (routePanel.requestFullscreen) await routePanel.requestFullscreen();
+        else expandedInPage = true;
+      } catch {
+        expandedInPage = true;
+      }
+    }
+  } finally {
+    switchingFullscreen = false;
+    syncFullscreen();
+  }
+});
+document.addEventListener("fullscreenchange", syncFullscreen);
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape" || !expandedInPage) return;
+  expandedInPage = false;
+  syncFullscreen();
+  fullscreenButton.focus();
+});
 
 function svgElement(svg, tag, attrs, label) {
   const element = document.createElementNS("http://www.w3.org/2000/svg", tag);
