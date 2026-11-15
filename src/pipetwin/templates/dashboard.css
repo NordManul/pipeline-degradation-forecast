@@ -71,11 +71,11 @@ main { padding-bottom: 36px; }
 .panel-head .eyebrow { margin-bottom: 6px; }
 .scale { display: flex; align-items: center; gap: .55rem; color: var(--muted); font-size: .8rem; white-space: nowrap; }
 .scale select { padding: .4rem .5rem; }
-.viewport { position: relative; margin: 0 12px; overflow: hidden; border: 1px solid #283f48; border-radius: 11px; background: radial-gradient(ellipse at 50% 35%, #172f39, #0b1820 72%); }
+.viewport { position: relative; isolation: isolate; margin: 0 12px; overflow: hidden; border: 1px solid #283f48; border-radius: 11px; background: radial-gradient(ellipse at 50% 35%, #172f39, #0b1820 72%); }
 #scene { display: block; width: 100%; height: clamp(300px, 35vw, 475px); touch-action: none; cursor: grab; }
 #scene:active { cursor: grabbing; }
 #scene:focus-visible { outline-offset: -3px; }
-.view-controls { position: absolute; top: 12px; right: 12px; display: grid; gap: 6px; }
+.view-controls { position: absolute; top: 12px; right: 12px; z-index: 3; display: grid; gap: 6px; }
 .view-controls button { width: 36px; height: 36px; padding: 0; font-size: 1.15rem; }
 .view-controls svg { width: 18px; height: 18px; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 #fullscreen-view .collapse-icon, #fullscreen-view[aria-pressed="true"] .expand-icon { display: none; }
@@ -94,6 +94,38 @@ main { padding-bottom: 36px; }
   white-space: nowrap;
   pointer-events: none;
 }
+.thickness-tooltip {
+  position: absolute;
+  z-index: 2;
+  min-width: 4.5rem;
+  transform: translate(-50%, -100%);
+  padding: 5px 9px;
+  border: 1px solid #73dfc5;
+  border-radius: 7px;
+  background: #0d242a;
+  color: #cefff2;
+  font-size: .82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 3px 12px #071319bf;
+}
+.thickness-tooltip::after {
+  content: "";
+  position: absolute;
+  left: clamp(8px, calc(50% + var(--tip-offset, 0px)), calc(100% - 8px));
+  bottom: -4px;
+  width: 6px;
+  height: 6px;
+  transform: translateX(-50%) rotate(45deg);
+  border-right: 1px solid #73dfc5;
+  border-bottom: 1px solid #73dfc5;
+  background: #0d242a;
+}
+.thickness-tooltip.below { transform: translateX(-50%); }
+.thickness-tooltip.below::after { top: -4px; bottom: auto; transform: translateX(-50%) rotate(225deg); }
 .map-scale {
   position: absolute;
   transform: translateX(-50%);

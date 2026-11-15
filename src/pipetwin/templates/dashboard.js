@@ -8,6 +8,7 @@ const routePanel = byId("route-panel");
 const fullscreenButton = byId("fullscreen-view");
 const mapScale = byId("map-scale");
 const endpointLabels = [byId("route-start"), byId("route-end")];
+const thicknessTooltip = byId("thickness-tooltip");
 const chart = byId("section-chart");
 const scatter = byId("scatter-chart");
 const initialView = {yaw: -.43, pitch: .58, roll: 0, zoom: 1, target: null, offsetX: 0, offsetY: 0, follow: false};
@@ -40,6 +41,7 @@ const lighting = [.58, .66, .74, .82, .90, .98, 1.06, 1.14];
 let activeCase = "case1";
 let rows, route, bounds, priorityRows, domain, minThickness, maxThickness;
 let screenPoints = [];
+let showThickness = false;
 let mesh;
 let hitRadius = 24;
 let frame = 0;
@@ -143,7 +145,8 @@ function prepareMesh(heightScale) {
     const si = Math.sin(incline), ci = Math.cos(incline);
     const offsets = ringOffsets.map(([lateral, vertical]) =>
       [-lateral * sh - vertical * si * ch, lateral * ch - vertical * si * sh, vertical * ci]);
-    return {centre, offsets};
+    const tangent = [ci * ch, ci * sh, si];
+    return {centre, offsets, tangent};
   };
   const rings = Array.from({length: points.length + 1}, (_, i) => ringAt(i));
   const palette = rows.map(row => lighting.map(light => colour(row.thickness_pred, light)));
@@ -191,22 +194,23 @@ function drawTube(project, heightScale, radius, radiusPx, width, height, stride)
     context.fill();
     context.stroke();
   };
-  function drawEnd(ring, centre, next) {
-    const dx = next[0] - centre[0], dy = next[1] - centre[1];
-    const length = hypot(dx, dy);
-    const band = length > .1 ? Math.min(8, .72 * radiusPx / length) : 0;
-    const rim = factor => ring.map(p => [
-      centre[0] + factor * (p[0] - centre[0]), centre[1] + factor * (p[1] - centre[1])
-    ]);
-    const outer = rim(1.16), inner = rim(.70);
-    const back = outer.map(([x, y]) => [x + dx * band, y + dy * band]);
-    for (let i = 0; i < ring.length; i++) {
-      const j = (i + 1) % ring.length;
-      if (ring[i][2] + ring[j][2] >= 2 * centre[2]) {
-        quad(outer[i], outer[j], back[j], back[i], outer[i][1] < centre[1] ? "#bfd4d9" : "#718f98");
+  function drawEnd(index) {
+    const {centre, offsets, tangent} = rings[index];
+    const direction = index === 0 ? -1 : 1;
+    const rim = (factor, length) => offsets.map(offset =>
+      project(...centre.map((v, axis) => v + radius * (factor * offset[axis] + direction * length * tangent[axis]))));
+    const collarLength = .8;
+    const mouth = project(...centre.map((v, axis) => v + direction * collarLength * radius * tangent[axis]));
+    const seat = project(...centre);
+    const outer = rim(1.14, collarLength), back = rim(1.14, 0);
+    for (let i = 0; i < outer.length; i++) {
+      const j = (i + 1) % outer.length;
+      if (outer[i][2] + outer[j][2] >= 2 * mouth[2]) {
+        quad(outer[i], outer[j], back[j], back[i], outer[i][1] < mouth[1] ? "#bfd4d9" : "#718f98");
       }
     }
-    if (centre[2] < next[2]) return;
+    if (mouth[2] < seat[2]) return;
+    const inner = rim(.73, collarLength), recess = rim(.73, collarLength * .34);
     context.beginPath();
     for (const [i, [x, y]] of inner.entries()) {
       if (i === 0) context.moveTo(x, y);
@@ -215,11 +219,10 @@ function drawTube(project, heightScale, radius, radiusPx, width, height, stride)
     context.closePath();
     context.fillStyle = "#091419";
     context.fill();
-    const recess = inner.map(([x, y]) => [x + dx * band * .45, y + dy * band * .45]);
-    for (let i = 0; i < ring.length; i++) {
-      const j = (i + 1) % ring.length;
-      if (ring[i][2] + ring[j][2] < 2 * centre[2]) quad(inner[i], inner[j], recess[j], recess[i], "#314951");
-      quad(outer[i], outer[j], inner[j], inner[i], outer[i][1] < centre[1] ? "#c5d7d8" : "#8daab0");
+    for (let i = 0; i < outer.length; i++) {
+      const j = (i + 1) % outer.length;
+      if (outer[i][2] + outer[j][2] < 2 * mouth[2]) quad(inner[i], inner[j], recess[j], recess[i], "#314951");
+      quad(outer[i], outer[j], inner[j], inner[i], outer[i][1] < mouth[1] ? "#c5d7d8" : "#8daab0");
     }
   }
   spans.sort((a, b) => a.depth - b.depth);
@@ -236,17 +239,31 @@ function drawTube(project, heightScale, radius, radiusPx, width, height, stride)
         quad(a[i], a[j], b[j], b[i], colours[shade]);
       }
     }
-    if (start === 0) ends.push([a, centreA, centreB]);
-    if (end === points.length) ends.push([b, centreB, centreA]);
+    if (start === 0) ends.push([start, centreA]);
+    if (end === points.length) ends.push([end, centreB]);
   }
   ends.sort((a, b) => a[1][2] - b[1][2]);
   if (ends.length === 2 && hypot(ends[0][1][0] - ends[1][1][0], ends[0][1][1] - ends[1][1][1]) < 2 * radiusPx) {
     ends.shift();
   }
-  for (const [ring, centre, next] of ends) drawEnd(ring, centre, next);
+  for (const [index] of ends) drawEnd(index);
 }
 
-function drawEndpointLabels(width, height, radius) {
+function positionThicknessTooltip(point, width, height, radius) {
+  thicknessTooltip.hidden = !showThickness || !point ||
+    point[0] < 0 || point[0] > width || point[1] < 0 || point[1] > height;
+  if (thicknessTooltip.hidden) return null;
+  const [x, y] = point;
+  const above = y >= radius + 39;
+  const labelX = clamp(x, 44, width - 44);
+  thicknessTooltip.classList.toggle("below", !above);
+  thicknessTooltip.style.left = Math.round(labelX) + "px";
+  thicknessTooltip.style.top = Math.round(y + (above ? -radius - 9 : radius + 9)) + "px";
+  thicknessTooltip.style.setProperty("--tip-offset", Math.round(x - labelX) + "px");
+  return {x, y, above};
+}
+
+function drawEndpointLabels(width, height, radius, tooltip) {
   const ends = [screenPoints[0], screenPoints.at(-1)];
   const close = ends.every(Boolean) && Math.abs(ends[0][0] - ends[1][0]) < 128 &&
     Math.abs(ends[0][1] - ends[1][1]) < 60;
@@ -255,7 +272,8 @@ function drawEndpointLabels(width, height, radius) {
     label.hidden = !point || point[0] < 0 || point[0] > width || point[1] < 0 || point[1] > height;
     if (label.hidden) continue;
     const [x, y] = point;
-    const above = close && y > 52 && y < height - 52 ? index === 0 : y > 52;
+    const nearTooltip = tooltip && Math.abs(x - tooltip.x) < 88 && Math.abs(y - tooltip.y) < 31;
+    const above = nearTooltip ? !tooltip.above : close && y > 52 && y < height - 52 ? index === 0 : y > 52;
     const labelX = clamp(x, 67, width - 67);
     const labelY = clamp(y + (above ? -radius - 20 : radius + 15), 16, height - 16);
     label.style.left = Math.round(labelX) + "px";
@@ -282,6 +300,7 @@ function drawScene() {
   context.clearRect(0, 0, width, height);
   if (!bounds) {
     mapScale.hidden = true;
+    thicknessTooltip.hidden = true;
     for (const label of endpointLabels) label.hidden = true;
     context.textAlign = "center";
     context.fillStyle = "#a9bdc0";
@@ -326,7 +345,9 @@ function drawScene() {
   // At overview scale multiple cells share a pixel. Restore one span per cell as the route fills the view.
   const stride = 2 ** Math.max(0, Math.ceil(Math.log2(3 * rows.length / (baseScale * span * view.zoom))));
   drawTube(project, heightScale, radiusPx / scale, radiusPx, width, height, stride);
-  drawEndpointLabels(width, height, radiusPx);
+  const selected = screenPoints[chosen[activeCase]];
+  const tooltip = positionThicknessTooltip(selected, width, height, radiusPx);
+  drawEndpointLabels(width, height, radiusPx, tooltip);
   const occupied = new Set();
   const pointMarker = (point, size, color, fill) => {
     context.beginPath();
@@ -347,7 +368,6 @@ function drawScene() {
     occupied.add(bucket);
     pointMarker(point, 2.2, "#ffd28c", "#33291e");
   }
-  const selected = screenPoints[chosen[activeCase]];
   if (selected) {
     pointMarker(selected, radiusPx + 4, "#f7fff9");
     pointMarker(selected, 4, "#f7fff9", "#15302e");
@@ -573,11 +593,13 @@ function renderQuality() {
   renderScatter(observations, warm);
 }
 
-function selectSegment(index) {
+function selectSegment(index, showTooltip = false) {
   if (!Number.isFinite(index)) index = chosen[activeCase] ?? 0;
   index = clamp(Math.round(index), 0, rows.length - 1);
   chosen[activeCase] = index;
   const row = rows[index];
+  showThickness = showTooltip;
+  if (showThickness) thicknessTooltip.textContent = mm(row.thickness_pred);
   byId("focus-segment").disabled = !route[index];
   if (view.follow && route[index]) view.target = index;
   byId("segment").value = index;
@@ -678,12 +700,12 @@ function rollAt(angle, [x, y]) {
   view.follow = false;
 }
 
-function focusSegment(index = chosen[activeCase]) {
+function focusSegment(index = chosen[activeCase], showTooltip = showThickness) {
   if (!route[index]) return;
   const routeLength = rows[rows.length - 1].end_m;
   Object.assign(view, {target: index, offsetX: 0, offsetY: 0, follow: true,
     zoom: Math.max(1, routeLength / 140)});
-  selectSegment(index);
+  selectSegment(index, showTooltip);
 }
 
 function stepSegment(delta) {
@@ -751,7 +773,7 @@ canvas.addEventListener("gesturechange", event => {
 canvas.addEventListener("gestureend", () => { nativeGesture = null; });
 canvas.addEventListener("dblclick", event => {
   const index = nearestSegment(...canvasPosition(event));
-  if (index !== null) focusSegment(index);
+  if (index !== null) focusSegment(index, true);
 });
 let moved = false;
 canvas.addEventListener("pointerdown", event => {
@@ -792,7 +814,11 @@ canvas.addEventListener("pointermove", event => {
 canvas.addEventListener("pointerup", event => {
   if (!pointers.delete(event.pointerId) || moved) return;
   const nearest = nearestSegment(...canvasPosition(event));
-  if (nearest !== null) selectSegment(nearest);
+  if (nearest !== null) selectSegment(nearest, true);
+  else if (showThickness) {
+    showThickness = false;
+    redrawScene();
+  }
 });
 canvas.addEventListener("lostpointercapture", event => pointers.delete(event.pointerId));
 canvas.addEventListener("pointercancel", event => pointers.delete(event.pointerId));
