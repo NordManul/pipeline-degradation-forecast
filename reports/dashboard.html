@@ -103,6 +103,7 @@ main { padding-bottom: 36px; }
 }
 .thickness-tooltip {
   position: absolute;
+  display: block;
   z-index: 2;
   min-width: 4.5rem;
   transform: translate(-50%, -100%);
@@ -393,7 +394,6 @@ const lighting = [.58, .66, .74, .82, .90, .98, 1.06, 1.14];
 let activeCase = "case1";
 let rows, route, bounds, priorityRows, domain, minThickness, maxThickness;
 let screenPoints = [];
-let showThickness = false;
 let mesh;
 let hitRadius = 24;
 let frame = 0;
@@ -602,7 +602,7 @@ function drawTube(project, heightScale, radius, radiusPx, width, height, stride)
 }
 
 function positionThicknessTooltip(point, width, height, radius) {
-  thicknessTooltip.hidden = !showThickness || !point ||
+  thicknessTooltip.hidden = !point ||
     point[0] < 0 || point[0] > width || point[1] < 0 || point[1] > height;
   if (thicknessTooltip.hidden) return null;
   const [x, y] = point;
@@ -720,7 +720,7 @@ function drawScene() {
     occupied.add(bucket);
     pointMarker(point, 2.2, "#ffd28c", "#33291e");
   }
-  if (selected) {
+  if (tooltip) {
     pointMarker(selected, radiusPx + 4, "#f7fff9");
     pointMarker(selected, 4, "#f7fff9", "#15302e");
   }
@@ -945,13 +945,12 @@ function renderQuality() {
   renderScatter(observations, warm);
 }
 
-function selectSegment(index, showTooltip = false) {
+function selectSegment(index) {
   if (!Number.isFinite(index)) index = chosen[activeCase] ?? 0;
   index = clamp(Math.round(index), 0, rows.length - 1);
   chosen[activeCase] = index;
   const row = rows[index];
-  showThickness = showTooltip;
-  if (showThickness) thicknessTooltip.textContent = mm(row.thickness_pred);
+  thicknessTooltip.textContent = mm(row.thickness_pred);
   byId("focus-segment").disabled = !route[index];
   if (view.follow && route[index]) view.target = index;
   byId("segment").value = index;
@@ -1052,12 +1051,12 @@ function rollAt(angle, [x, y]) {
   view.follow = false;
 }
 
-function focusSegment(index = chosen[activeCase], showTooltip = showThickness) {
+function focusSegment(index = chosen[activeCase]) {
   if (!route[index]) return;
   const routeLength = rows[rows.length - 1].end_m;
   Object.assign(view, {target: index, offsetX: 0, offsetY: 0, follow: true,
     zoom: Math.max(1, routeLength / 140)});
-  selectSegment(index, showTooltip);
+  selectSegment(index);
 }
 
 function stepSegment(delta) {
@@ -1125,7 +1124,7 @@ canvas.addEventListener("gesturechange", event => {
 canvas.addEventListener("gestureend", () => { nativeGesture = null; });
 canvas.addEventListener("dblclick", event => {
   const index = nearestSegment(...canvasPosition(event));
-  if (index !== null) focusSegment(index, true);
+  if (index !== null) focusSegment(index);
 });
 let moved = false;
 canvas.addEventListener("pointerdown", event => {
@@ -1166,11 +1165,7 @@ canvas.addEventListener("pointermove", event => {
 canvas.addEventListener("pointerup", event => {
   if (!pointers.delete(event.pointerId) || moved) return;
   const nearest = nearestSegment(...canvasPosition(event));
-  if (nearest !== null) selectSegment(nearest, true);
-  else if (showThickness) {
-    showThickness = false;
-    redrawScene();
-  }
+  if (nearest !== null) selectSegment(nearest);
 });
 canvas.addEventListener("lostpointercapture", event => pointers.delete(event.pointerId));
 canvas.addEventListener("pointercancel", event => pointers.delete(event.pointerId));

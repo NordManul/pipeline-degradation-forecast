@@ -96,6 +96,7 @@ main { padding-bottom: 36px; }
 }
 .thickness-tooltip {
   position: absolute;
+  display: block;
   z-index: 2;
   min-width: 4.5rem;
   transform: translate(-50%, -100%);
