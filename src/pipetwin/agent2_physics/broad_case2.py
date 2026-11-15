@@ -185,6 +185,27 @@ class FixedAverage:
         return np.mean(list(bounded.values()), axis=0)
 
 
+@dataclass
+class AlignedProfileBlend:
+    """Combine two predicted shapes at the level and scale of the baseline."""
+
+    baseline: TabularCandidate
+    local: TabularCandidate
+    group_keys: list[str]
+    weight: float
+
+    def predict(self, frame, *, development=False):
+        base = self.baseline.predict(frame, development=development)
+        local = self.local.predict(frame, development=development)
+        aligned = np.empty(len(frame))
+        for indices in frame.groupby(self.group_keys, dropna=False).indices.values():
+            a, b = base[indices], local[indices]
+            scale = b.std()
+            shape = (b - b.mean()) / scale if scale > 1e-9 else np.zeros_like(b)
+            aligned[indices] = a.mean() + a.std() * shape
+        return (1 - self.weight) * base + self.weight * aligned
+
+
 def fit(spec, package, frame, groups):
     measured, weights = training_rows(frame, spec.pool)
     if spec.name.startswith("reference_") or spec.learner.startswith("agent2_"):
