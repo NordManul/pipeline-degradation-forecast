@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipetwin.reporting import FIGURES, PROFILE_COLUMNS, observation_table, profile_table, write_report
+from pipetwin.reporting import PROFILE_COLUMNS, observation_table, profile_table, route_coordinates, write_report
 
 
 def _frame(section, anchor):
@@ -57,8 +57,6 @@ def test_portable_report_preserves_download_bytes_and_embeds_strict_json(tmp_pat
     (tmp_path / "result.csv").write_bytes(original)
     for name in ("metrics.csv", "priority_segments.csv", "summary.json", "cleaning.csv"):
         (tmp_path / name).write_text("test\n", encoding="utf-8")
-    for name in FIGURES:
-        (tmp_path / (name + ".png")).write_bytes(b"image-for-serialization-test")
     write_report(tmp_path, warm, cold, warm, _frame("late", True), cold, priority, metrics, summary)
     html = (tmp_path / "dashboard.html").read_text(encoding="utf-8")
     embedded = re.search(r'<script type="application/json" id="report-data">(.*?)</script>', html, re.S).group(1)
@@ -67,5 +65,15 @@ def test_portable_report_preserves_download_bytes_and_embeds_strict_json(tmp_pat
     assert data["summary"]["test"] == summary["test"]
     assert "</script>" not in embedded
     assert sum(row["anchor_mm"] is None for row in data["profiles"]) == 3
-    assert html.count('src="data:image/png;base64,') == len(FIGURES)
+    assert '<canvas id="scene"' in html and not data["routes"]
     assert "@@" not in html
+
+
+def test_route_uses_local_metres_and_keeps_unsurveyed_cells_unknown():
+    cells = pd.DataFrame({"id": ["42"]*3, "segment_id": [0, 1, 2],
+                          "center_m": [5., 15., 25.], "end_m": [10., 20., 30.]})
+    survey = pd.DataFrame({"id": [42, 42], "total_distance": [0., 20.],
+                           "lon": [50., 50.0002], "lat": [56., 56.0001], "z": [80., 84.]})
+    route = route_coordinates(cells, survey)["42"]
+    assert route[0][2] == 1 and route[1][2] == 3 and route[2] is None
+    assert route[0][0] > 0 and route[1][1] > route[0][1] > 0

@@ -14,7 +14,6 @@ from .case1 import FINAL_MODEL as CASE1_MODEL
 from .case1 import fit_case1, prepare_case1, score_late
 from .case2 import fit_case2, prepare_transfer
 from .models.cold_profile import FINAL_MODEL as CASE2_MODEL, PRIORITY_MODEL as CASE2_PRIORITY
-from .plots import plot_dependencies, plot_observed, plot_profiles, plot_residuals, plot_stability, plot_validation
 from .quality import read_raw_sources
 from .reporting import write_report
 from .sources import read_config
@@ -85,12 +84,6 @@ def run(data_dir, output, template_path=None):
         metrics.to_csv(staged / "metrics.csv", index=False, float_format="%.12g", lineterminator="\n")
         priority.to_csv(staged / "priority_segments.csv", index=False, float_format="%.8f", lineterminator="\n")
         _cleaning_summary(audits).to_csv(staged / "cleaning.csv", index=False, lineterminator="\n")
-        plot_profiles(staged, warm, cold, priority)
-        plot_validation(staged, warm_scores, transfer.loc[transfer.seed.eq(seed)])
-        plot_observed(staged, warm_oof, late_oof, cold_oof)
-        plot_dependencies(staged, warm_oof, cold_oof, cold)
-        plot_residuals(staged, warm_oof, late_oof, cold_oof)
-        plot_stability(staged, metrics)
         summary = {
             "result_sha256": sha256(result.read_bytes()).hexdigest(),
             "template": "organizer_file" if template_path else "passport_grid",
@@ -103,8 +96,11 @@ def run(data_dir, output, template_path=None):
             "case2_macro_validation": macro.round(12).reset_index().to_dict("records"),
             "sources": manifest,
         }
+        closed = read_config("configs/closed_scores.yaml")
+        if summary["result_sha256"] == closed["result_sha256"]:
+            summary["closed_validation"] = closed
         (staged / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        write_report(staged, warm, cold, warm_oof, late_oof, cold_oof, priority, metrics, summary)
+        write_report(staged, warm, cold, warm_oof, late_oof, cold_oof, priority, metrics, summary, raw["profile"])
         staged.rename(output)
     return summary
 
@@ -116,7 +112,7 @@ def main(argv=None):
     parser.add_argument("--template", type=Path, help="Organizer CSV with id and segment_id in the required order")
     args = parser.parse_args(argv)
     summary = run(args.data_dir, args.output, args.template)
-    print(f"{summary['case1']['cells'] + summary['case2']['cells']:,} rows → {args.output / 'result.csv'}")
+    print(f"{summary['case1']['cells'] + summary['case2']['cells']:,} rows written to {args.output / 'result.csv'}")
 
 
 if __name__ == "__main__":

@@ -32,6 +32,14 @@ def test_published_profile_and_embedded_download_match_submission():
     downloaded = data["downloads"]["result.csv"].encode("utf-8")
     assert downloaded == (ROOT / "result.csv").read_bytes()
     assert sha256(downloaded).hexdigest() == data["summary"]["result_sha256"]
+    assert data["summary"]["closed_validation"]["result_sha256"] == sha256(downloaded).hexdigest()
+    assert set(data["routes"]) == set(profiles.id)
+    for section, rows in profiles.groupby("id"):
+        route = np.array(data["routes"][section], dtype=float)
+        assert route.shape == (len(rows), 3)
+        assert np.isfinite(route).all()
+        assert np.linalg.norm(np.ptp(route[:, :2], axis=0)) > 100
+        assert np.ptp(route[:, 2]) > 1
     for name in ("metrics.csv", "priority_segments.csv", "profile_data.csv", "validation_predictions.csv"):
         assert data["downloads"][name].encode("utf-8") == (report / name).read_bytes()
 

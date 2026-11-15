@@ -22,7 +22,7 @@ dependencies = {file = ["requirements.txt"]}
 where = ["src"]
 
 [tool.setuptools.package-data]
-pipetwin = ["templates/*.html"]
+pipetwin = ["templates/*.html", "templates/*.css", "templates/*.js"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

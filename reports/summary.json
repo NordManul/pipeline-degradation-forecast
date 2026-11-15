@@ -137,5 +137,17 @@
       "rows": 495,
       "columns": 59
     }
+  },
+  "closed_validation": {
+    "result_sha256": "d3e7c68e744ef0d9761e2bdfe532622b62d3e0b66e6f77c7ef1241b9292b8ba9",
+    "source": "Оценки первой закрытой сдачи, сообщённые командой",
+    "case1": {
+      "mae_mm": 0.367,
+      "pearson_squared": 0.234
+    },
+    "case2": {
+      "mae_mm": 0.433,
+      "pearson_squared": 0.039
+    }
   }
 }

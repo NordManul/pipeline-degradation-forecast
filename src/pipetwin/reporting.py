@@ -1,6 +1,5 @@
-"""Portable report with embedded data, images and auditable plotting tables."""
+"""Portable report with embedded data and auditable plotting tables."""
 
-import base64
 from html import escape
 from importlib.resources import files
 import json
@@ -9,7 +8,6 @@ import numpy as np
 import pandas as pd
 
 
-FIGURES = ("profiles", "validation", "predicted_observed", "dependencies", "residuals", "stability")
 PROFILE_COLUMNS = [
     "id", "segment_id", "target_date", "start_m", "end_m", "center_m", "nominal_mm",
     "thickness_pred", "position_fraction", "altitude_relative_m", "anchor_observed",
@@ -52,45 +50,98 @@ def _records(frame):
     return json.loads(frame.to_json(orient="records", date_format="iso", double_precision=12))
 
 
-def _overview(output, metrics, summary):
-    warm = metrics.loc[metrics.case.eq("case1") & metrics.model.eq("direct_blend")].set_index("split")
-    cold = next(row for row in summary["case2_macro_validation"]
-                if row["model"] == "xgboost_knn" and row["seed"] == summary["seed"])
-    values = [f'{warm.loc["spatial_2022", "pearson_squared"]:.3f}',
-              f'{warm.loc["late_2023", "pearson_squared"]:.3f}', f'{cold["pearson_squared"]:.3f}',
-              f'{summary["case1"]["cells"] + summary["case2"]["cells"]:,}'.replace(",", " ")]
-    labels = ["Кейс 1 · история", "Кейс 1 · позднее ВТД", "Кейс 2 · перенос", "Прогнозов в result.csv"]
+def route_coordinates(profiles, survey):
+    """Project the supplied surveyed route to local metres, without extrapolation."""
+    result = {}
+    if survey is None:
+        return result
+    ids = pd.to_numeric(survey.id, errors="coerce")
+    for section, rows in profiles.groupby("id", sort=False):
+        numeric_id = pd.to_numeric(section, errors="coerce")
+        points = survey.loc[ids.eq(numeric_id), ["total_distance", "lon", "lat", "z"]]
+        points = points.apply(pd.to_numeric, errors="coerce").dropna().drop_duplicates()
+        points = points.loc[np.isfinite(points).all(axis=1) & points.total_distance.ge(0)
+                            & points.total_distance.le(float(rows.end_m.max()) + .1)]
+        points = points.loc[~points.total_distance.duplicated(keep=False)].sort_values("total_distance")
+        if len(points) < 2:
+            continue
+        local = points[["lon", "lat", "z"]].to_numpy()
+        origin = local[0].copy()
+        local -= origin
+        local[:, 0] *= 111_195*np.cos(np.deg2rad(origin[1]))
+        local[:, 1] *= 111_195
+        distance = points.total_distance.to_numpy()
+        centre = rows.sort_values("segment_id").center_m.to_numpy()
+        coords = np.column_stack([np.interp(centre, distance, column, left=np.nan, right=np.nan)
+                                  for column in local.T])
+        result[section] = [[round(float(value), 2) for value in point] if np.isfinite(point).all() else None
+                           for point in coords]
+    return result
+
+
+def _overview(output, profiles, routes):
     cards = []
-    for i, (value, label) in enumerate(zip(values, labels)):
-        x = 48 + i*286
-        cards.append(f'<text x="{x}" y="195" fill="#85e0d0" font-size="42" font-weight="700">{escape(value)}</text>'
-                     f'<text x="{x}" y="225" fill="#bccbd8" font-size="16">{escape(label)}</text>')
-    svg = ('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300">'
-           '<rect width="1200" height="300" rx="20" fill="#132b3c"/>'
+    for index, (_, rows) in enumerate(profiles.groupby("case", sort=True)):
+        left = 805 if index == 0 else 999
+        section = rows.id.iloc[0]
+        hue = "#73dfc5" if index == 0 else "#ffd28c"
+        cards.append(f'<rect x="{left}" y="35" width="176" height="246" rx="12" fill="#102027" stroke="#294047"/>'
+                     f'<text x="{left + 15}" y="63" font-size="15" fill="{hue}">Кейс {index + 1}</text>'
+                     f'<text x="{left + 15}" y="259" font-size="13" fill="#b0c3c6">{escape(str(section))}</text>')
+        route = routes.get(section, [])
+        points = np.array([point if point is not None else [np.nan] * 3 for point in route])
+        if not len(points) or not np.isfinite(points).any():
+            continue
+        xy = points[:, :2] @ np.array([[.82, .57], [-.57, .82]])
+        xy -= (np.nanmin(xy, axis=0) + np.nanmax(xy, axis=0)) / 2
+        xy *= min(130 / max(1, np.nanmax(np.abs(xy[:, 0])) * 2),
+                  134 / max(1, np.nanmax(np.abs(xy[:, 1])) * 2))
+        xy[:, 0] += left + 88
+        xy[:, 1] = 152 - xy[:, 1]
+        commands = []
+        connected = False
+        for x, y in xy:
+            if np.isfinite([x, y]).all():
+                commands.append(f'{"L" if connected else "M"}{x:.1f},{y:.1f}')
+                connected = True
+            else:
+                connected = False
+        cards.append(f'<path d="{" ".join(commands)}" fill="none" stroke="{hue}" stroke-width="3.2" '
+                     'stroke-linecap="round" stroke-linejoin="round"/>')
+    cells = f"{len(profiles):,}".replace(",", " ")
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="316" viewBox="0 0 1200 316">'
+           '<title>PipeTwin. Прогноз остаточной толщины на двух участках</title>'
+           '<rect width="1200" height="316" rx="20" fill="#091319"/>'
            '<g font-family="Segoe UI,DejaVu Sans,sans-serif">'
-           '<text x="48" y="65" font-size="38" font-weight="700" fill="white">PipeTwin</text>'
-           '<text x="48" y="104" font-size="20" fill="#bccbd8">Прогноз остаточной толщины · две модели · единый воспроизводимый запуск</text>'
-           + "".join(cards)
-           + '<text x="48" y="272" fill="#93a7b8" font-size="14">Pearson² на открытых контрольных ВТД. Качество на скрытых целевых участках ещё не измерено.</text></g></svg>')
+           '<circle cx="52" cy="51" r="8" fill="none" stroke="#73dfc5" stroke-width="3"/>'
+           '<text x="70" y="59" font-size="22" font-weight="700" fill="#edf4f2">PipeTwin</text>'
+           '<text x="42" y="129" font-size="48" font-weight="700" fill="#edf4f2">Толщина стенки</text>'
+           '<text x="42" y="185" font-size="48" font-weight="700" fill="#edf4f2">вдоль трубопровода</text>'
+           '<path d="M42 217H748" stroke="#294047"/>'
+           f'<text x="42" y="253" font-size="18" fill="#b0c3c6">{cells} ячеек · две трассы · профиль и приоритеты</text>'
+           + "".join(cards) + '</g></svg>')
     (output / "overview.svg").write_text(svg + "\n", encoding="utf-8")
 
 
-def write_report(output, warm, cold, warm_oof, late_oof, cold_oof, priority, metrics, summary):
+def write_report(output, warm, cold, warm_oof, late_oof, cold_oof, priority, metrics, summary, survey=None):
     profiles = profile_table(warm, cold, priority)
     observed = observation_table(warm_oof, late_oof, cold_oof)
     profiles.to_csv(output / "profile_data.csv", index=False, float_format="%.12g", lineterminator="\n")
     observed.to_csv(output / "validation_predictions.csv", index=False, float_format="%.12g", lineterminator="\n")
+    routes = route_coordinates(profiles, survey)
     data = {"profiles": _records(profiles), "metrics": _records(metrics), "summary": summary,
+            "routes": routes,
+            "observations": _records(observed[["case", "split", "main_id", "y_mm", "thickness_pred"]]),
             "downloads": {name: (output / name).read_bytes().decode("utf-8")
                           for name in ("result.csv", "metrics.csv", "priority_segments.csv",
                                        "profile_data.csv", "validation_predictions.csv", "summary.json", "cleaning.csv")}}
-    template = files("pipetwin").joinpath("templates/dashboard.html").read_text(encoding="utf-8")
+    assets = files("pipetwin").joinpath("templates")
+    template = assets.joinpath("dashboard.html").read_text(encoding="utf-8")
     encoded = json.dumps(data, ensure_ascii=False, allow_nan=False, separators=(",", ":")).replace("<", "\\u003c")
-    html = template.replace("@@DATA@@", encoded)
-    for name in FIGURES:
-        image = base64.b64encode((output / f"{name}.png").read_bytes()).decode("ascii")
-        html = html.replace(f"@@{name.upper()}@@", f"data:image/png;base64,{image}")
+    html = (template.replace("@@STYLES@@", assets.joinpath("dashboard.css").read_text(encoding="utf-8"))
+            .replace("@@SCRIPT@@", assets.joinpath("dashboard.js").read_text(encoding="utf-8"))
+            .replace("@@DATA@@", encoded))
     if "@@" in html:
         raise ValueError("An unresolved report template marker remains")
     (output / "dashboard.html").write_text(html, encoding="utf-8")
-    _overview(output, metrics, summary)
+    _overview(output, profiles, routes)
