@@ -669,10 +669,12 @@ canvas.addEventListener("pointermove", event => {
   pointers.set(event.pointerId, current);
   if (pointers.size === 2) {
     const other = [...pointers.entries()].find(([id]) => id !== event.pointerId)[1];
-    const previousDistance = hypot(before[0] - other[0], before[1] - other[1]);
-    if (previousDistance < 1) return;
-    const distance = hypot(current[0] - other[0], current[1] - other[1]);
+    const ax = before[0] - other[0], ay = before[1] - other[1];
+    const bx = current[0] - other[0], by = current[1] - other[1];
+    const previousDistance = hypot(ax, ay), distance = hypot(bx, by);
+    if (Math.min(previousDistance, distance) < 8) return;
     zoom(distance / previousDistance, [(before[0] + other[0]) / 2, (before[1] + other[1]) / 2]);
+    view.yaw += Math.atan2(ax * by - ay * bx, ax * bx + ay * by);
     view.offsetX += dx / 2;
     view.offsetY += dy / 2;
   } else if (event.shiftKey) {
