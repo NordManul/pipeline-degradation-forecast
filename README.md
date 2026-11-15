@@ -1,10 +1,10 @@
 # [degradation forecast](https://github.com/NordManul/pipeline-degradation-forecast)
 
-![degradation forecast. Прогноз остаточной толщины и трассы двух участков](reports/overview.svg)
+[![Открыть интерактивную 3D-модель трубопровода](reports/overview.svg)](https://nordmanul.github.io/pipeline-degradation-forecast/)
 
 Модель оценивает минимальную остаточную толщину стенки в каждой 10-метровой ячейке. В итоговом файле **2 000 прогнозов** для двух участков.
 
-**[Скачать 3D-отчёт](https://github.com/NordManul/pipeline-degradation-forecast/raw/refs/heads/main/reports/dashboard.html)** · **[Файл сдачи](result.csv)** · [Методика](docs/method.md) · [Данные и единицы](docs/data-quality.md)
+**[Открыть 3D-модель](https://nordmanul.github.io/pipeline-degradation-forecast/)** · **[Файл сдачи](result.csv)** · [Методика](docs/method.md) · [Данные и единицы](docs/data-quality.md)
 
 ## Итоговая сдача
 
@@ -22,7 +22,7 @@
 
 ## Посмотреть прогноз в 3D
 
-Скачайте [**dashboard.html**](https://github.com/NordManul/pipeline-degradation-forecast/raw/refs/heads/main/reports/dashboard.html) и откройте в браузере. Файл автономный и работает офлайн.
+[Открыть дашборд в браузере](https://nordmanul.github.io/pipeline-degradation-forecast/) · [Скачать HTML для просмотра офлайн](https://github.com/NordManul/pipeline-degradation-forecast/raw/refs/heads/main/reports/dashboard.html)
 
 1. **Откройте вкладку «Кейс 1» или «Кейс 2».** Труба, профиль и метрики обновятся на той же странице. Перетащите трубу для вращения и настройте масштаб высоты. Оттенки поверхности показывают прогноз в миллиметрах по шкале выбранного участка.
 2. **Найдите сегмент.** Выберите точку на трассе, на графике или в списке приоритета. Карточка показывает расстояние, прогноз, высоту и прошлое ВТД, где оно доступно.
