@@ -84,20 +84,17 @@ main { padding-bottom: 36px; }
 .route-coverage:empty { display: none; }
 .map-scale {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
-  display: grid;
-  justify-items: start;
-  gap: 4px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: #091319e8;
-  color: #c7d9db;
-  font-size: .72rem;
+  transform: translateX(-50%);
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #091319ed;
+  color: #edf4f2;
+  font-size: .76rem;
+  font-variant-numeric: tabular-nums;
   line-height: 1.25;
+  white-space: nowrap;
   pointer-events: none;
 }
-.scale-ruler { display: grid; place-items: end center; min-height: 15px; border: 1px solid #c7d9db; border-top: 0; font-variant-numeric: tabular-nums; }
 .route.expanded {
   position: fixed;
   inset: 0;

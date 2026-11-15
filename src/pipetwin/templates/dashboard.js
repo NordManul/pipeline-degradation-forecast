@@ -7,11 +7,10 @@ const context = canvas.getContext("2d");
 const routePanel = byId("route-panel");
 const fullscreenButton = byId("fullscreen-view");
 const mapScale = byId("map-scale");
-const gridLabel = byId("grid-step");
-const scaleRuler = byId("scale-ruler");
 const chart = byId("section-chart");
 const scatter = byId("scatter-chart");
 const initialView = {yaw: -.43, pitch: .58, zoom: 1, target: null, offsetX: 0, offsetY: 0, follow: false};
+const minPitch = .18;
 const view = {...initialView};
 const chosen = {case1: null, case2: null};
 const formatter = (digits = 0) => new Intl.NumberFormat("ru-RU", {
@@ -73,15 +72,59 @@ function distanceLabel(metres) {
   return fmt(metres, metres < 1 ? 1 : 0) + " м";
 }
 
-function updateScale(step, pixelsPerMetre, width) {
-  const rulerMetres = niceDistance(Math.min(width * .32, 155) / pixelsPerMetre);
-  const stepText = "Шаг сетки · " + distanceLabel(step);
-  const rulerText = distanceLabel(rulerMetres);
-  const rulerWidth = (rulerMetres * pixelsPerMetre).toFixed(1) + "px";
-  if (gridLabel.textContent !== stepText) gridLabel.textContent = stepText;
-  if (scaleRuler.textContent !== rulerText) scaleRuler.textContent = rulerText;
-  if (scaleRuler.style.width !== rulerWidth) scaleRuler.style.width = rulerWidth;
-  mapScale.hidden = false;
+function drawGrid(project, unproject, step, width, height, eastward) {
+  // Clip the work to the part of the horizontal plane visible on screen.
+  const inset = 3;
+  const corners = [[-inset, -inset], [width + inset, -inset],
+    [width + inset, height + inset], [-inset, height + inset]].map(([x, y]) => unproject(x, y));
+  const [left, bottom] = [0, 1].map(axis => Math.floor(Math.min(...corners.map(p => p[axis])) / step));
+  const [right, top] = [0, 1].map(axis => Math.ceil(Math.max(...corners.map(p => p[axis])) / step));
+  const line = (a, b) => {
+    context.moveTo(a[0], a[1]);
+    context.lineTo(b[0], b[1]);
+  };
+  context.lineWidth = 1;
+  context.strokeStyle = "#294651";
+  context.beginPath();
+  for (let i = left; i <= right; i++) line(project(i * step, bottom * step), project(i * step, top * step));
+  for (let i = bottom; i <= top; i++) line(project(left * step, i * step), project(right * step, i * step));
+  context.stroke();
+
+  // Mark one actual grid edge near the lower-left of the view.
+  const targetX = Math.min(.32 * width, 136), targetY = height - 43;
+  const [east, north] = unproject(targetX, targetY);
+  const alongX = eastward ? 1 : 0, alongY = 1 - alongX;
+  const startX = Math.round(east / step - alongX / 2);
+  const startY = Math.round(north / step - alongY / 2);
+  let edge = null, closest = Infinity;
+  for (let i = -2; i <= 2; i++) {
+    for (let j = -2; j <= 2; j++) {
+      const ix = startX + i, iy = startY + j;
+      const a = project(ix * step, iy * step), b = project((ix + alongX) * step, (iy + alongY) * step);
+      if ([a, b].some(([x, y]) => x < 12 || x > width - 12 || y < 12 || y > height - 31)) continue;
+      const x = (a[0] + b[0]) / 2, y = (a[1] + b[1]) / 2;
+      const distance = (x - targetX) ** 2 + (y - targetY) ** 2;
+      if (distance < closest) {
+        closest = distance;
+        edge = {a, b, x, y};
+      }
+    }
+  }
+  mapScale.hidden = !edge;
+  if (!edge) return;
+  const {a, b, x, y} = edge;
+  const lengthPx = hypot(b[0] - a[0], b[1] - a[1]);
+  const tx = 4 * (a[1] - b[1]) / lengthPx, ty = 4 * (b[0] - a[0]) / lengthPx;
+  context.strokeStyle = "#9eb8c1";
+  context.lineWidth = 1.6;
+  context.beginPath();
+  line(a, b);
+  for (const p of [a, b]) line([p[0] - tx, p[1] - ty], [p[0] + tx, p[1] + ty]);
+  context.stroke();
+  const label = distanceLabel(step);
+  if (mapScale.textContent !== label) mapScale.textContent = label;
+  mapScale.style.left = Math.round(x) + "px";
+  mapScale.style.top = Math.round(y + 8) + "px";
 }
 
 function prepareMesh(heightScale) {
@@ -204,25 +247,14 @@ function drawScene() {
       height * .49 + view.offsetY - scale * (dy * cp - forward * sp), depth];
   }
 
-  const gridStep = niceDistance(span * .14 / view.zoom);
-  const gridLines = Math.ceil(span * .57 / view.zoom / gridStep);
-  const gridSpan = gridStep * gridLines;
-  updateScale(gridStep, scale, width);
-  const gridY = (view.target === null ? bounds.min[2] : elevation) * heightScale - gridSpan * .097;
-  context.lineWidth = 1;
-  context.strokeStyle = "#294651";
-  context.beginPath();
-  for (let index = -gridLines; index <= gridLines; index++) {
-    const offset = gridStep * index;
-    for (const [a, b] of [
-      [project(east - gridSpan, north + offset, gridY), project(east + gridSpan, north + offset, gridY)],
-      [project(east + offset, north - gridSpan, gridY), project(east + offset, north + gridSpan, gridY)]
-    ]) {
-      context.moveTo(a[0], a[1]);
-      context.lineTo(b[0], b[1]);
-    }
+  const gridStep = niceDistance(Math.min(width, height) * .20 / scale);
+  const gridY = (view.target === null ? bounds.min[2] : elevation) * heightScale - 21 / scale;
+  const [originX, originY] = project(east, north, gridY);
+  function unprojectGrid(x, y) {
+    const sideways = (x - originX) / scale, forward = (y - originY) / (scale * sp);
+    return [east + sideways * cy + forward * sy, north - sideways * sy + forward * cy];
   }
-  context.stroke();
+  drawGrid((x, y) => project(x, y, gridY), unprojectGrid, gridStep, width, height, Math.abs(cy) >= Math.abs(sy));
 
   screenPoints = route.map(point => point && project(point[0], point[1], point[2] * heightScale));
   const radiusPx = clamp(Math.min(width, height) * .038 * Math.sqrt(view.zoom), 7, 26);
@@ -603,8 +635,8 @@ canvas.addEventListener("keydown", event => {
   event.preventDefault();
   if (key === "ArrowLeft") view.yaw -= .1;
   if (key === "ArrowRight") view.yaw += .1;
-  if (key === "ArrowUp") view.pitch = clamp(view.pitch + .1, -.95, 1.4);
-  if (key === "ArrowDown") view.pitch = clamp(view.pitch - .1, -.95, 1.4);
+  if (key === "ArrowUp") view.pitch = clamp(view.pitch + .1, minPitch, 1.4);
+  if (key === "ArrowDown") view.pitch = clamp(view.pitch - .1, minPitch, 1.4);
   if (key === "+" || key === "=") zoom(1.23);
   if (key === "-") zoom(1 / 1.23);
   if (key === "Home") byId("reset-view").click();
@@ -648,7 +680,7 @@ canvas.addEventListener("pointermove", event => {
     view.offsetY += dy;
   } else {
     view.yaw += dx * .009;
-    view.pitch = clamp(view.pitch + dy * .009, -.95, 1.4);
+    view.pitch = clamp(view.pitch + dy * .009, minPitch, 1.4);
   }
   redrawScene();
 });
