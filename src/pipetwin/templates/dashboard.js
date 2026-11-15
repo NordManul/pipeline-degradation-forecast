@@ -7,9 +7,10 @@ const context = canvas.getContext("2d");
 const routePanel = byId("route-panel");
 const fullscreenButton = byId("fullscreen-view");
 const mapScale = byId("map-scale");
+const endpointLabels = [byId("route-start"), byId("route-end")];
 const chart = byId("section-chart");
 const scatter = byId("scatter-chart");
-const initialView = {yaw: -.43, pitch: .58, zoom: 1, target: null, offsetX: 0, offsetY: 0, follow: false};
+const initialView = {yaw: -.43, pitch: .58, roll: 0, zoom: 1, target: null, offsetX: 0, offsetY: 0, follow: false};
 const minPitch = .18;
 const view = {...initialView};
 const chosen = {case1: null, case2: null};
@@ -153,6 +154,7 @@ function drawTube(project, heightScale, radius, radiusPx, width, height, stride)
   if (mesh?.heightScale !== heightScale) mesh = prepareMesh(heightScale);
   const {points, rings, palette} = mesh;
   const spans = [];
+  const ends = [];
   const projected = new Map();
   let start = 0;
   while (start < points.length) {
@@ -192,16 +194,16 @@ function drawTube(project, heightScale, radius, radiusPx, width, height, stride)
   function drawEnd(ring, centre, next) {
     const dx = next[0] - centre[0], dy = next[1] - centre[1];
     const length = hypot(dx, dy);
-    const band = length ? Math.min(.5, .38 * radiusPx / length) : 0;
+    const band = length > .1 ? Math.min(8, .72 * radiusPx / length) : 0;
     const rim = factor => ring.map(p => [
       centre[0] + factor * (p[0] - centre[0]), centre[1] + factor * (p[1] - centre[1])
     ]);
-    const outer = rim(1.08), inner = rim(.74);
+    const outer = rim(1.16), inner = rim(.70);
     const back = outer.map(([x, y]) => [x + dx * band, y + dy * band]);
     for (let i = 0; i < ring.length; i++) {
       const j = (i + 1) % ring.length;
       if (ring[i][2] + ring[j][2] >= 2 * centre[2]) {
-        quad(outer[i], outer[j], back[j], back[i], outer[i][1] < centre[1] ? "#8daab0" : "#49646d");
+        quad(outer[i], outer[j], back[j], back[i], outer[i][1] < centre[1] ? "#bfd4d9" : "#718f98");
       }
     }
     if (centre[2] < next[2]) return;
@@ -234,8 +236,36 @@ function drawTube(project, heightScale, radius, radiusPx, width, height, stride)
         quad(a[i], a[j], b[j], b[i], colours[shade]);
       }
     }
-    if (start === 0) drawEnd(a, centreA, centreB);
-    if (end === points.length) drawEnd(b, centreB, centreA);
+    if (start === 0) ends.push([a, centreA, centreB]);
+    if (end === points.length) ends.push([b, centreB, centreA]);
+  }
+  ends.sort((a, b) => a[1][2] - b[1][2]);
+  if (ends.length === 2 && hypot(ends[0][1][0] - ends[1][1][0], ends[0][1][1] - ends[1][1][1]) < 2 * radiusPx) {
+    ends.shift();
+  }
+  for (const [ring, centre, next] of ends) drawEnd(ring, centre, next);
+}
+
+function drawEndpointLabels(width, height, radius) {
+  const ends = [screenPoints[0], screenPoints.at(-1)];
+  const close = ends.every(Boolean) && Math.abs(ends[0][0] - ends[1][0]) < 128 &&
+    Math.abs(ends[0][1] - ends[1][1]) < 60;
+  for (const [index, label] of endpointLabels.entries()) {
+    const point = ends[index];
+    label.hidden = !point || point[0] < 0 || point[0] > width || point[1] < 0 || point[1] > height;
+    if (label.hidden) continue;
+    const [x, y] = point;
+    const above = close && y > 52 && y < height - 52 ? index === 0 : y > 52;
+    const labelX = clamp(x, 67, width - 67);
+    const labelY = clamp(y + (above ? -radius - 20 : radius + 15), 16, height - 16);
+    label.style.left = Math.round(labelX) + "px";
+    label.style.top = Math.round(labelY) + "px";
+    context.beginPath();
+    context.moveTo(x, y + (above ? -radius : radius));
+    context.lineTo(labelX, labelY);
+    context.strokeStyle = "#819da4";
+    context.lineWidth = 1;
+    context.stroke();
   }
 }
 
@@ -252,6 +282,7 @@ function drawScene() {
   context.clearRect(0, 0, width, height);
   if (!bounds) {
     mapScale.hidden = true;
+    for (const label of endpointLabels) label.hidden = true;
     context.textAlign = "center";
     context.fillStyle = "#a9bdc0";
     context.font = "14px system-ui";
@@ -267,22 +298,26 @@ function drawScene() {
   const scale = baseScale * view.zoom;
   const sy = Math.sin(view.yaw), cy = Math.cos(view.yaw);
   const sp = Math.sin(view.pitch), cp = Math.cos(view.pitch);
+  const sr = Math.sin(view.roll), cr = Math.cos(view.roll);
   function project(x, z, h) {
     const dx = x - east, dz = z - north, dy = h - elevation * heightScale;
     const forward = dx * sy + dz * cy;
     const depth = forward * cp + dy * sp;
-    return [width / 2 + view.offsetX + scale * (dx * cy - dz * sy),
-      height * .49 + view.offsetY - scale * (dy * cp - forward * sp), depth];
+    const sideways = dx * cy - dz * sy, vertical = forward * sp - dy * cp;
+    return [width / 2 + view.offsetX + scale * (sideways * cr - vertical * sr),
+      height * .49 + view.offsetY + scale * (sideways * sr + vertical * cr), depth];
   }
 
   const gridStep = niceDistance(Math.min(width, height) * .20 / scale);
   const gridY = (view.target === null ? bounds.min[2] : elevation) * heightScale - 21 / scale;
   const [originX, originY] = project(east, north, gridY);
   function unprojectGrid(x, y) {
-    const sideways = (x - originX) / scale, forward = (y - originY) / (scale * sp);
+    const dx = (x - originX) / scale, dy = (y - originY) / scale;
+    const sideways = dx * cr + dy * sr, forward = (dy * cr - dx * sr) / sp;
     return [east + sideways * cy + forward * sy, north - sideways * sy + forward * cy];
   }
-  drawGrid((x, y) => project(x, y, gridY), unprojectGrid, gridStep, width, height, Math.abs(cy) >= Math.abs(sy));
+  const eastward = Math.abs(cy * cr - sy * sp * sr) >= Math.abs(-sy * cr - cy * sp * sr);
+  drawGrid((x, y) => project(x, y, gridY), unprojectGrid, gridStep, width, height, eastward);
 
   screenPoints = route.map(point => point && project(point[0], point[1], point[2] * heightScale));
   const radiusPx = clamp(Math.min(width, height) * .038 * Math.sqrt(view.zoom), 7, 26);
@@ -291,6 +326,7 @@ function drawScene() {
   // At overview scale multiple cells share a pixel. Restore one span per cell as the route fills the view.
   const stride = 2 ** Math.max(0, Math.ceil(Math.log2(3 * rows.length / (baseScale * span * view.zoom))));
   drawTube(project, heightScale, radiusPx / scale, radiusPx, width, height, stride);
+  drawEndpointLabels(width, height, radiusPx);
   const occupied = new Set();
   const pointMarker = (point, size, color, fill) => {
     context.beginPath();
@@ -609,6 +645,9 @@ function nearestSegment(x, y) {
 
 function canvasPosition(event) {
   const rect = canvas.getBoundingClientRect();
+  if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) {
+    return [canvas.clientWidth / 2, canvas.clientHeight / 2];
+  }
   return [event.clientX - rect.left, event.clientY - rect.top];
 }
 
@@ -627,6 +666,16 @@ function zoom(factor, position) {
   }
   view.zoom = next;
   redrawScene();
+}
+
+function rollAt(angle, [x, y]) {
+  const cx = canvas.clientWidth / 2, cy = canvas.clientHeight * .49;
+  const dx = cx + view.offsetX - x, dy = cy + view.offsetY - y;
+  const c = Math.cos(angle), s = Math.sin(angle);
+  view.offsetX = x - cx + dx * c - dy * s;
+  view.offsetY = y - cy + dx * s + dy * c;
+  view.roll += angle;
+  view.follow = false;
 }
 
 function focusSegment(index = chosen[activeCase]) {
@@ -670,19 +719,44 @@ canvas.addEventListener("keydown", event => {
   if (key === "Home") byId("reset-view").click();
   redrawScene();
 });
+const pointers = new Map();
+let nativeGesture = null;
 canvas.addEventListener("wheel", event => {
   event.preventDefault();
-  const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 200 : 1);
-  zoom(Math.exp(clamp(-delta * .0025, -.5, .5)), canvasPosition(event));
+  if (nativeGesture) return;
+  const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 200 : 1;
+  const dx = (event.deltaX || 0) * units, dy = event.deltaY * units;
+  if (!event.ctrlKey && !event.metaKey && (event.shiftKey || Math.abs(dx) > Math.max(1, Math.abs(dy) * .4))) {
+    view.yaw += clamp((dx || dy) * .008, -.35, .35);
+    if (dx && !event.shiftKey) view.pitch = clamp(view.pitch + dy * .004, minPitch, 1.4);
+    redrawScene();
+  } else {
+    zoom(Math.exp(clamp(-dy * .0025, -.5, .5)), canvasPosition(event));
+  }
 }, {passive: false});
+canvas.addEventListener("gesturestart", event => {
+  event.preventDefault();
+  if (pointers.size > 0) return;
+  nativeGesture = {scale: 1, rotation: 0};
+}, {passive: false});
+canvas.addEventListener("gesturechange", event => {
+  if (!nativeGesture) return;
+  event.preventDefault();
+  if (!(event.scale > 0) || !Number.isFinite(event.rotation)) return;
+  const position = canvasPosition(event);
+  zoom(event.scale / nativeGesture.scale, position);
+  rollAt((event.rotation - nativeGesture.rotation) * Math.PI / 180, position);
+  nativeGesture = {scale: event.scale, rotation: event.rotation};
+}, {passive: false});
+canvas.addEventListener("gestureend", () => { nativeGesture = null; });
 canvas.addEventListener("dblclick", event => {
   const index = nearestSegment(...canvasPosition(event));
   if (index !== null) focusSegment(index);
 });
-const pointers = new Map();
 let moved = false;
 canvas.addEventListener("pointerdown", event => {
   if (event.button !== 0 || pointers.size >= 2) return;
+  nativeGesture = null;
   moved = pointers.size > 0;
   pointers.set(event.pointerId, canvasPosition(event));
   canvas.setPointerCapture(event.pointerId);
@@ -701,8 +775,9 @@ canvas.addEventListener("pointermove", event => {
     const bx = current[0] - other[0], by = current[1] - other[1];
     const previousDistance = hypot(ax, ay), distance = hypot(bx, by);
     if (Math.min(previousDistance, distance) < 8) return;
-    zoom(distance / previousDistance, [(before[0] + other[0]) / 2, (before[1] + other[1]) / 2]);
-    view.yaw += Math.atan2(ax * by - ay * bx, ax * bx + ay * by);
+    const midpoint = [(before[0] + other[0]) / 2, (before[1] + other[1]) / 2];
+    zoom(distance / previousDistance, midpoint);
+    rollAt(Math.atan2(ax * by - ay * bx, ax * bx + ay * by), midpoint);
     view.offsetX += dx / 2;
     view.offsetY += dy / 2;
   } else if (event.shiftKey) {
@@ -720,6 +795,7 @@ canvas.addEventListener("pointerup", event => {
   if (nearest !== null) selectSegment(nearest);
 });
 canvas.addEventListener("lostpointercapture", event => pointers.delete(event.pointerId));
+canvas.addEventListener("pointercancel", event => pointers.delete(event.pointerId));
 chart.addEventListener("click", event => {
   if (!domain) return;
   const rect = chart.getBoundingClientRect();

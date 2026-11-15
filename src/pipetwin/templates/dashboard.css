@@ -82,6 +82,18 @@ main { padding-bottom: 36px; }
 #fullscreen-view[aria-pressed="true"] .collapse-icon { display: inline-block; }
 .route-coverage { position: absolute; top: 12px; left: 12px; color: var(--gold); font-size: .72rem; pointer-events: none; }
 .route-coverage:empty { display: none; }
+.route-endpoint {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 3px 6px;
+  border: 1px solid #819da4;
+  border-radius: 4px;
+  background: #102027f5;
+  color: #edf4f2;
+  font-size: .72rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .map-scale {
   position: absolute;
   transform: translateX(-50%);
