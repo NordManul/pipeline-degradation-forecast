@@ -494,14 +494,42 @@ function drawTube(project, heightScale, radius, radiusPx, width, height, stride)
     context.fill();
     context.stroke();
   };
-  const inset = (p, o) => [o[0] + .66 * (p[0] - o[0]), o[1] + .66 * (p[1] - o[1])];
+  function drawEnd(ring, centre, next) {
+    const dx = next[0] - centre[0], dy = next[1] - centre[1];
+    const length = hypot(dx, dy);
+    const band = length ? Math.min(.5, .38 * radiusPx / length) : 0;
+    const rim = factor => ring.map(p => [
+      centre[0] + factor * (p[0] - centre[0]), centre[1] + factor * (p[1] - centre[1])
+    ]);
+    const outer = rim(1.08), inner = rim(.74);
+    const back = outer.map(([x, y]) => [x + dx * band, y + dy * band]);
+    for (let i = 0; i < ring.length; i++) {
+      const j = (i + 1) % ring.length;
+      if (ring[i][2] + ring[j][2] >= 2 * centre[2]) {
+        quad(outer[i], outer[j], back[j], back[i], outer[i][1] < centre[1] ? "#8daab0" : "#49646d");
+      }
+    }
+    if (centre[2] < next[2]) return;
+    context.beginPath();
+    for (const [i, [x, y]] of inner.entries()) {
+      if (i === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.closePath();
+    context.fillStyle = "#091419";
+    context.fill();
+    const recess = inner.map(([x, y]) => [x + dx * band * .45, y + dy * band * .45]);
+    for (let i = 0; i < ring.length; i++) {
+      const j = (i + 1) % ring.length;
+      if (ring[i][2] + ring[j][2] < 2 * centre[2]) quad(inner[i], inner[j], recess[j], recess[i], "#314951");
+      quad(outer[i], outer[j], inner[j], inner[i], outer[i][1] < centre[1] ? "#c5d7d8" : "#8daab0");
+    }
+  }
   spans.sort((a, b) => a.depth - b.depth);
   context.lineWidth = .65;
   for (const {start, end, centreA, centreB, depth} of spans) {
     const a = vertices(start), b = vertices(end);
     const colours = palette[Math.floor((start + end - 1) / 2)];
-    const frontCap = !points[start - 1] && centreA[2] >= centreB[2];
-    const rearCap = !points[end] && centreB[2] >= centreA[2];
     for (let i = 0; i < a.length; i++) {
       const j = (i + 1) % a.length;
       const facing = (a[i][2] + a[j][2] + b[i][2] + b[j][2] - 2 * depth) / (4 * radius);
@@ -510,9 +538,9 @@ function drawTube(project, heightScale, radius, radiusPx, width, height, stride)
         const shade = clamp(Math.round(3 + 2.1 * facing + 2.5 * upward), 0, lighting.length - 1);
         quad(a[i], a[j], b[j], b[i], colours[shade]);
       }
-      if (frontCap) quad(a[i], a[j], inset(a[j], centreA), inset(a[i], centreA), colours[4]);
-      if (rearCap) quad(b[j], b[i], inset(b[i], centreB), inset(b[j], centreB), colours[4]);
     }
+    if (start === 0) drawEnd(a, centreA, centreB);
+    if (end === points.length) drawEnd(b, centreB, centreA);
   }
 }
 
