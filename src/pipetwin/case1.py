@@ -163,7 +163,10 @@ def fit_case1(train, query, late, config, target_id):
     rate = BetweenInspections(seed, annual_loss=True).fit(train)
     late_predictions = {"persistence": direct.persistence(late), "annual_loss_blend": rate.predict(late),
                         FINAL_MODEL: direct.predict(late)}
-    return direct.predict(query), late_predictions, pd.concat(scores, ignore_index=True)
+    observed = oof.loc[oof.observed, ["id", "segment_id", "y_mm", FINAL_MODEL]].rename(
+        columns={FINAL_MODEL: "thickness_pred"}
+    )
+    return direct.predict(query), late_predictions, pd.concat(scores, ignore_index=True), observed
 
 
 def score_late(late, predictions, raw, cleaned, grid, target_contract, config, freeze):

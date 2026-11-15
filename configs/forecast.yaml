@@ -1,4 +1,5 @@
 seed: 42
+case2_validation_seeds: [42, 123, 2024]
 development:
   ids: ["1250009490", "1250022871", "1250011604"]
   anchor_date: "2018-09-23"

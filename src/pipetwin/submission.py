@@ -11,6 +11,16 @@ from .sources import canonical_ids
 KEYS = ["id", "segment_id"]
 
 
+def rank_segments(frame, values, model):
+    """Rank the lowest predicted thickness in the full target section."""
+    count = int(np.ceil(.1 * len(frame)))
+    ranked = (frame[KEYS].assign(ranking_thickness_mm=values)
+              .sort_values(["ranking_thickness_mm", "segment_id"]).head(count))
+    return ranked.assign(rank=np.arange(1, count + 1), ranking_model=model)[
+        KEYS + ["rank", "ranking_thickness_mm", "ranking_model"]
+    ]
+
+
 def normalize_keys(frame):
     frame = frame.copy()
     if not set(KEYS).issubset(frame):

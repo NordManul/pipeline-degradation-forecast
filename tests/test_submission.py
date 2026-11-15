@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipetwin.submission import export_submission, validate_submission
+from pipetwin.submission import export_submission, rank_segments, validate_submission
 
 
 def predictions():
@@ -42,3 +42,10 @@ def test_invalid_submission_fails_instead_of_silently_fixing(problem):
         data["segment_id"] = [0.5, 1.0]
     with pytest.raises(ValueError):
         validate_submission(data, template)
+def test_rank_uses_a_rounded_up_decile_and_stable_ties():
+    frame = pd.DataFrame({"id": ["101"] * 12, "segment_id": list(reversed(range(12)))})
+    scores = [6.] * 9 + [2.] * 3
+    ranked = rank_segments(frame, scores, "forest")
+    assert ranked.segment_id.tolist() == [0, 1]
+    assert ranked["rank"].tolist() == [1, 2]
+    assert ranked.ranking_model.tolist() == ["forest"] * 2

@@ -3,3 +3,4 @@
 /docs/task/*.pdf -text
 # The export uses CRLF on every platform to preserve the submitted bytes.
 /result.csv -text whitespace=cr-at-eol
+/reports/*.csv text eol=lf

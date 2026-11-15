@@ -6,3 +6,4 @@ matplotlib==3.10.3
 PyYAML==6.0.2
 catboost==1.2.8
 threadpoolctl==3.8.0
+xgboost-cpu==3.4.1

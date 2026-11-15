@@ -5,7 +5,8 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
 from .case1 import FINAL_MODEL as CASE1_MODEL
-from .case2 import FINAL_MODEL as CASE2_MODEL
+from .case2 import CATBOOST_CONTROL
+from .models.cold_profile import BOOST_MODEL, FINAL_MODEL as CASE2_MODEL
 
 
 BLUE = "#17657d"
@@ -64,14 +65,20 @@ def plot_validation(output, historic, transfer):
     left.legend(loc="upper right", frameon=False, fontsize=8.5, labelcolor=INK)
     left.set_ylim(min(0.0, warm.min().min() - .08), max(.72, warm.max().max() + .14))
 
-    order = ["donors_2018", "donors_2018_2022", "all_donors_unweighted", CASE2_MODEL]
-    comparison = transfer.loc[transfer.held_main.eq("MAIN-3")].set_index("model").loc[order, "pearson_r"]
-    x = np.arange(len(order))
-    _bars(right, x, comparison, .63, ["#a8b4be", "#8ca7b6", "#658a9c", BLUE])
-    right.set_xticks(x, ["2018", "2018, 2022", "Все три\nВТД", "Все три ВТД\nс весами"])
-    right.set_title("Кейс 2 · перенос с MAIN-2 на MAIN-3", loc="left", color=INK)
-    right.set_xlabel("Обучение на MAIN-2 · оценка по 94 меткам MAIN-3")
-    right.set_ylim(min(0.0, comparison.min() - .05), max(.37, comparison.max() + .05))
+    cold = transfer.loc[transfer.split.eq("holdout_main")].pivot(
+        index=["held_main", "campaign"], columns="model", values="pearson_r"
+    )
+    x = np.arange(len(cold))
+    for offset, (model, label, color) in enumerate([
+        (CATBOOST_CONTROL, "CatBoost", "#a8b4be"),
+        (BOOST_MODEL, "XGBoost", "#658a9c"),
+        (CASE2_MODEL, "XGBoost + KNN", BLUE),
+    ], start=-1):
+        _bars(right, x + .25 * offset, cold[model], .23, color, label=label)
+    right.set_xticks(x, [f"{main}\n{date:%m.%Y}" for main, date in cold.index])
+    right.set_title("Кейс 2 · целая магистраль в контроле", loc="left", color=INK)
+    right.legend(loc="upper left", frameon=False, fontsize=8.5, labelcolor=INK)
+    right.set_ylim(min(0.0, cold.min().min() - .04), max(.62, cold.max().max() + .1))
 
     for ax in (left, right):
         ax.set_ylabel("Pearson r")
@@ -79,3 +86,25 @@ def plot_validation(output, historic, transfer):
         ax.set_axisbelow(True)
         ax.spines[["top", "right"]].set_visible(False)
     figure.savefig(output / "validation.png", dpi=170)
+
+
+def plot_observed(output, warm, cold):
+    figure = Figure(figsize=(12, 4.8), layout="constrained")
+    FigureCanvasAgg(figure)
+    axes = figure.subplots(1, 3)
+    figure.suptitle("Прогноз и факт на отложенных ВТД", fontsize=15, color=INK)
+    sets = [("Кейс 1 · блоки цели", warm),
+            ("Кейс 2 · MAIN-2", cold.loc[cold.main_id.eq("MAIN-2")]),
+            ("Кейс 2 · MAIN-3", cold.loc[cold.main_id.eq("MAIN-3")])]
+    for ax, (title, frame) in zip(axes, sets):
+        actual, predicted = frame.y_mm.to_numpy(), frame.thickness_pred.to_numpy()
+        limit = min(actual.min(), predicted.min()) - .1, max(actual.max(), predicted.max()) + .1
+        ax.plot(limit, limit, ls="--", color=MUTED, linewidth=.8)
+        ax.scatter(actual, predicted, color=BLUE, s=12, alpha=.33, linewidths=0)
+        ax.set(xlim=limit, ylim=limit, xlabel="Измеренная толщина, мм", ylabel="Прогноз, мм")
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_title(f"{title}\n{len(frame)} наблюдаемых минимумов", loc="left", color=INK)
+        ax.grid(color=PALE, linewidth=.55)
+        ax.set_axisbelow(True)
+        ax.spines[["top", "right"]].set_visible(False)
+    figure.savefig(output / "predicted_observed.png", dpi=170)

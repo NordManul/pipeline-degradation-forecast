@@ -1,4 +1,4 @@
-"""Reproduce the two-case submission and its two validation figures."""
+"""Reproduce the two-case submission, validation figures and priority list."""
 
 import argparse
 from hashlib import sha256
@@ -12,12 +12,12 @@ from threadpoolctl import threadpool_limits
 
 from .case1 import FINAL_MODEL as CASE1_MODEL
 from .case1 import fit_case1, prepare_case1, score_late
-from .case2 import FINAL_MODEL as CASE2_MODEL
 from .case2 import fit_case2, prepare_transfer
-from .plots import plot_profiles, plot_validation
+from .models.cold_profile import FINAL_MODEL as CASE2_MODEL, PRIORITY_MODEL as CASE2_PRIORITY
+from .plots import plot_observed, plot_profiles, plot_validation
 from .quality import read_raw_sources
 from .sources import read_config
-from .submission import KEYS, export_submission, validate_submission
+from .submission import KEYS, export_submission, rank_segments, validate_submission
 
 
 def _forecast(frame, values, spec):
@@ -47,12 +47,15 @@ def run(data_dir, output, template_path=None):
     config = read_config("configs/forecast.yaml")
     target_contract = read_config("configs/data_contract.yaml")
     policy = read_config("contracts/case2/retrospective.yaml")
+    seed = config["seed"]
     raw, manifest = read_raw_sources(data_dir)
     warm_train, warm, late, strict, grid = prepare_case1(raw, manifest, cases, target_contract, config)
     cold_train, cold, strict_audit, donor_audit = prepare_transfer(raw, manifest, cases, target_contract, policy, config)
     with threadpool_limits(limits=1):
-        warm_values, late_values, historic = fit_case1(warm_train, warm, late, config, cases["cases"]["case1"]["id"])
-        cold_values, transfer = fit_case2(cold_train, cold, config["seed"])
+        warm_values, late_values, historic, warm_oof = fit_case1(
+            warm_train, warm, late, config, cases["cases"]["case1"]["id"]
+        )
+        cold_values, cold_forest, transfer, cold_oof = fit_case2(cold_train, cold, seed, config["case2_validation_seeds"])
     late_scores, late_audit = score_late(
         late, late_values, raw, strict, grid, target_contract, config, config["late"]["label_pool_cutoff_exclusive"]
     )
@@ -64,9 +67,13 @@ def run(data_dir, output, template_path=None):
     expected_keys = pd.concat([warm[KEYS], cold[KEYS]], ignore_index=True)
     template = pd.read_csv(template_path, dtype={"id": str}) if template_path else expected_keys
     validate_submission(predictions, expected_keys)
-    metrics = pd.concat([warm_scores.assign(case="case1"), transfer.assign(case="case2")], ignore_index=True)
-    metrics = metrics[["case", "split", "model", "held_main", "campaign", "n", "pearson_r", "pearson_squared",
+    metrics = pd.concat([warm_scores.assign(case="case1", seed=seed), transfer.assign(case="case2")], ignore_index=True)
+    metrics = metrics[["case", "split", "model", "seed", "held_main", "campaign", "n", "pearson_r", "pearson_squared",
                        "mae_mm", "rmse_mm", "bias_mm", "recall_thin_10pct"]]
+    priority = pd.concat([rank_segments(warm, warm_values, CASE1_MODEL),
+                          rank_segments(cold, cold_forest, CASE2_PRIORITY)], ignore_index=True)
+    grouped = transfer.loc[transfer.split.eq("holdout_main")].groupby(["model", "seed", "held_main"])
+    macro = grouped[["pearson_r", "pearson_squared", "mae_mm", "recall_thin_10pct"]].mean().groupby(level=[0, 1]).mean()
     audits = {"case1": strict.audit, "case1_late_labels": late_audit, "case2": strict_audit, "case2_donors": donor_audit}
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".pipetwin-", dir=output.parent) as temp:
@@ -74,18 +81,22 @@ def run(data_dir, output, template_path=None):
         staged.mkdir()
         result = staged / "result.csv"
         export_submission(predictions, template, result)
-        metrics.to_csv(staged / "metrics.csv", index=False, float_format="%.12g")
+        metrics.to_csv(staged / "metrics.csv", index=False, float_format="%.12g", lineterminator="\n")
+        priority.to_csv(staged / "priority_segments.csv", index=False, float_format="%.8f", lineterminator="\n")
         _cleaning_summary(audits).to_csv(staged / "cleaning.csv", index=False)
         plot_profiles(staged, warm, cold)
-        plot_validation(staged, warm_scores, transfer)
+        plot_validation(staged, warm_scores, transfer.loc[transfer.seed.eq(seed)])
+        plot_observed(staged, warm_oof, cold_oof)
         summary = {
             "result_sha256": sha256(result.read_bytes()).hexdigest(),
             "template": "organizer_file" if template_path else "passport_grid",
-            "seed": config["seed"],
+            "seed": seed,
             "case1": {"model": CASE1_MODEL, "train_labels": int(warm_train.observed.sum()), "cells": len(warm),
                       "cells_with_anchor": int(warm.anchor_observed.sum())},
-            "case2": {"model": CASE2_MODEL, "train_labels": len(cold_train), "cells": len(cold),
-                      "training_mains": sorted(cold_train.main_id.unique()), "tech_coverage": float(cold.regime_coverage.iloc[0])},
+            "case2": {"model": CASE2_MODEL, "train_labels": int(cold_train.observed.sum()), "cells": len(cold),
+                      "training_mains": sorted(cold_train.main_id.unique()), "tech_coverage": float(cold.regime_coverage.iloc[0]),
+                      "priority_model": CASE2_PRIORITY, "validation_seeds": config["case2_validation_seeds"]},
+            "case2_macro_validation": macro.round(12).reset_index().to_dict("records"),
             "sources": manifest,
         }
         (staged / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
