@@ -61,3 +61,7 @@ python -m pytest -q
 | [data/raw](data/raw) · [docs/task](docs/task) | Шесть исходных таблиц, задание и критерии |
 | [reports](reports) | Готовый HTML, профили, приоритеты, метрики, аудит очистки |
 | [tests](tests) | Очистка, временные отсечки, модели и сверка экспортов |
+
+Эмпирические интервалы доступны для всех сегментов. Их покрытие проверено на поздних ВТД и при переносе между магистралями. [Методика и воспроизведение](docs/uncertainty.md) · [Интервалы](reports/uncertainty_intervals.csv) · [Покрытие](reports/uncertainty_validation.csv)
+
+[Презентация защиты](docs/defense/pipetwin-defense.pptx) · [Сравнение моделей для защиты](docs/comparison.md)
